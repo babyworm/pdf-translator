@@ -59,7 +59,11 @@ def parse_codex_response(response: str, count: int) -> list[str]:
                     if 0 <= idx < count and text:
                         result[idx] = text
                 return result
-            return [str(item) if item else None for item in data][:count]
+            result = [str(item) if item else None for item in data]
+            # Pad to exact count
+            while len(result) < count:
+                result.append(None)
+            return result[:count]
     except (json.JSONDecodeError, KeyError):
         pass
 
@@ -156,6 +160,7 @@ def translate_all(
     if not work_items:
         return results
 
+    workers = max(1, workers)
     with Pool(processes=min(workers, len(work_items))) as pool:
         for batch_results in pool.map(_worker_translate, work_items):
             for gidx, translated, original in batch_results:

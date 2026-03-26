@@ -70,28 +70,32 @@ def _collect(node: dict, out: list[Element]) -> None:
 
 
 def extract_pdf(pdf_path: str, output_dir: str | None = None, pages: str | None = None) -> list[Element]:
+    import shutil
     import opendataloader_pdf
 
     if output_dir:
-        # Use a fresh subdirectory to avoid stale JSON from previous runs
         work_dir = tempfile.mkdtemp(prefix="pdf_extract_", dir=output_dir)
     else:
         work_dir = tempfile.mkdtemp(prefix="pdf_translator_")
-    convert_args = dict(
-        input_path=pdf_path,
-        output_dir=work_dir,
-        format="json",
-    )
-    if pages:
-        convert_args["pages"] = pages
 
-    opendataloader_pdf.convert(**convert_args)
+    try:
+        convert_args = dict(
+            input_path=pdf_path,
+            output_dir=work_dir,
+            format="json",
+        )
+        if pages:
+            convert_args["pages"] = pages
 
-    json_files = list(Path(work_dir).glob("*.json"))
-    if not json_files:
-        raise FileNotFoundError(f"No JSON output found in {work_dir}")
+        opendataloader_pdf.convert(**convert_args)
 
-    with open(json_files[0], encoding="utf-8") as f:
-        data = json.load(f)
+        json_files = list(Path(work_dir).glob("*.json"))
+        if not json_files:
+            raise FileNotFoundError(f"No JSON output found in {work_dir}")
 
-    return parse_elements(data)
+        with open(json_files[0], encoding="utf-8") as f:
+            data = json.load(f)
+
+        return parse_elements(data)
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)

@@ -16,8 +16,16 @@ def build_batches(
     current: list[Element] = []
     current_chars = 0
 
+    import logging
+    logger = logging.getLogger(__name__)
+
     for el in valid:
         el_chars = len(el.content)
+        if el_chars > max_chars:
+            logger.warning(
+                "Element exceeds max_chars (%d > %d), sending as solo batch",
+                el_chars, max_chars,
+            )
         would_exceed_segments = len(current) >= max_segments
         would_exceed_chars = current_chars + el_chars > max_chars and current
 

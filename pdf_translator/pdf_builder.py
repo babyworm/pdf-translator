@@ -20,11 +20,18 @@ def _find_cjk_font() -> str | None:
     return None
 
 
+def _is_cjk(ch: str) -> bool:
+    cp = ord(ch)
+    return (0x4E00 <= cp <= 0x9FFF or 0x3400 <= cp <= 0x4DBF or
+            0xAC00 <= cp <= 0xD7AF or 0x3040 <= cp <= 0x30FF)
+
+
 def _fit_fontsize(text: str, rect: fitz.Rect, max_size: float) -> float:
     lo, hi = 4.0, max_size
     for _ in range(10):
         mid = (lo + hi) / 2
-        estimated_width = len(text) * mid * 0.6
+        # CJK chars are roughly full-width (~1.0), Latin ~0.6
+        estimated_width = sum(mid * (1.0 if _is_cjk(ch) else 0.6) for ch in text)
         if estimated_width <= rect.width:
             lo = mid
         else:

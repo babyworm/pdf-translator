@@ -43,10 +43,30 @@ def _collect(node: dict, out: list[Element]) -> None:
             level=node.get("level"),
         ))
 
-    for child_key in ("kids", "rows", "list items", "cells"):
+    # Recurse into sub-elements; emit "table row end" after each row
+    for child_key in ("kids", "list items"):
         for child in node.get(child_key, []):
             if isinstance(child, dict):
                 _collect(child, out)
+
+    # Handle table rows: collect cells, then emit row-end sentinel
+    for row in node.get("rows", []):
+        if isinstance(row, dict):
+            for cell in row.get("cells", []):
+                if isinstance(cell, dict):
+                    _collect(cell, out)
+            out.append(Element(
+                type="table row end",
+                content="",
+                page_number=node.get("page number", 0),
+                bbox=[0, 0, 0, 0],
+            ))
+
+    # Direct cells (outside rows context)
+    if "cells" in node and "rows" not in node:
+        for cell in node.get("cells", []):
+            if isinstance(cell, dict):
+                _collect(cell, out)
 
 
 def extract_pdf(pdf_path: str, output_dir: str | None = None, pages: str | None = None) -> list[Element]:

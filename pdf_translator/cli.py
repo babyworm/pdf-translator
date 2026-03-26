@@ -71,35 +71,36 @@ def run(cfg: TranslatorConfig) -> None:
 
         progress.update(task, description=f"Translating ({cfg.workers} workers)...")
         cache = None
-        if cfg.use_cache:
-            cache = TranslationCache(output_dir / "cache.db")
+        try:
+            if cfg.use_cache:
+                cache = TranslationCache(output_dir / "cache.db")
 
-        translations = translate_all(
-            batches,
-            source_lang=cfg.source_lang,
-            target_lang=cfg.target_lang,
-            effort=cfg.effort,
-            workers=cfg.workers,
-            cache=cache,
-        )
-        console.print(f"  Translated [cyan]{len(translations)}[/cyan] segments")
-        progress.update(task, advance=1)
+            translations = translate_all(
+                batches,
+                source_lang=cfg.source_lang,
+                target_lang=cfg.target_lang,
+                effort=cfg.effort,
+                workers=cfg.workers,
+                cache=cache,
+            )
+            console.print(f"  Translated [cyan]{len(translations)}[/cyan] segments")
+            progress.update(task, advance=1)
 
-        progress.update(task, description="Generating output...")
+            progress.update(task, description="Generating output...")
 
-        pdf_out = str(output_dir / f"{stem}_translated.pdf")
-        build_pdf(str(input_path), pdf_out, elements, translations)
-        console.print(f"  PDF: [green]{pdf_out}[/green]")
+            pdf_out = str(output_dir / f"{stem}_translated.pdf")
+            build_pdf(str(input_path), pdf_out, elements, translations)
+            console.print(f"  PDF: [green]{pdf_out}[/green]")
 
-        md_out = output_dir / f"{stem}_translated.md"
-        md_content = build_markdown(elements, translations)
-        md_out.write_text(md_content, encoding="utf-8")
-        console.print(f"  Markdown: [green]{md_out}[/green]")
+            md_out = output_dir / f"{stem}_translated.md"
+            md_content = build_markdown(elements, translations)
+            md_out.write_text(md_content, encoding="utf-8")
+            console.print(f"  Markdown: [green]{md_out}[/green]")
 
-        progress.update(task, advance=1)
-
-        if cache:
-            cache.close()
+            progress.update(task, advance=1)
+        finally:
+            if cache:
+                cache.close()
 
     console.print("[bold green]Done![/bold green]")
 

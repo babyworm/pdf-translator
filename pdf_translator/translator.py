@@ -81,11 +81,12 @@ def translate_batch(
     source_lang: str,
     target_lang: str,
     effort: str = "low",
-) -> list[str]:
+) -> list[str | None]:
+    """Translate a batch. Returns None for items that failed (codex failure)."""
     prompt = build_prompt(batch, source_lang, target_lang)
     response = _run_codex(prompt, effort)
     if not response:
-        return [el.content for el in batch]
+        return [None] * len(batch)  # signal failure, don't return originals
     return parse_codex_response(response, count=len(batch))
 
 
@@ -120,21 +121,23 @@ def translate_all(
     global_idx = 0
 
     for batch in batches:
+        all_cached = True
         batch_items: list[dict] = []
         for el in batch:
-            if cache:
-                cached = cache.get(el.content, source_lang, target_lang)
-                if cached:
-                    results[global_idx] = cached
-                    global_idx += 1
-                    continue
+            cached_text = cache.get(el.content, source_lang, target_lang) if cache else None
+            if cached_text:
+                results[global_idx] = cached_text
+            else:
+                all_cached = False
             batch_items.append({
                 "type": el.type, "content": el.content,
                 "page_number": el.page_number, "bbox": el.bbox,
                 "global_idx": global_idx,
+                "cached": cached_text is not None,
             })
             global_idx += 1
-        if batch_items:
+        # Send entire batch to codex if any item is uncached (preserve context)
+        if not all_cached:
             work_items.append((batch_items, source_lang, target_lang, effort))
 
     if not work_items:
@@ -143,8 +146,12 @@ def translate_all(
     with Pool(processes=min(workers, len(work_items))) as pool:
         for batch_results in pool.map(_worker_translate, work_items):
             for gidx, translated, original in batch_results:
-                results[gidx] = translated
-                if cache:
-                    cache.put(original, source_lang, target_lang, translated)
+                if translated is not None:
+                    results[gidx] = translated
+                    if cache:
+                        cache.put(original, source_lang, target_lang, translated)
+                elif gidx not in results:
+                    # Codex failed and no cache hit: fallback to original
+                    results[gidx] = original
 
     return results

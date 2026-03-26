@@ -44,3 +44,11 @@ def test_translate_batch_calls_codex():
     with patch("pdf_translator.translator._run_codex", return_value=mock_result):
         results = translate_batch(batch, "en", "ko", effort="low")
         assert results == ["안녕하세요"]
+
+
+def test_translate_batch_returns_none_on_failure():
+    batch = [_el("Hello"), _el("World")]
+
+    with patch("pdf_translator.translator._run_codex", return_value=""):
+        results = translate_batch(batch, "en", "ko", effort="low")
+        assert results == [None, None]

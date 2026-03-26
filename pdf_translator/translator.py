@@ -78,15 +78,34 @@ def parse_codex_response(response: str, count: int) -> list[str]:
 def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
     for attempt in range(max_retries + 1):
         try:
+            import tempfile, os
+            out_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".txt", delete=False, prefix="codex_out_",
+            )
+            out_path = out_file.name
+            out_file.close()
+
+            cmd = ["codex", "exec", "-s", "read-only", "-o", out_path]
+            if effort:
+                cmd += ["-c", f"reasoning_effort={effort}"]
+            cmd.append(prompt)
             result = subprocess.run(
-                ["codex", "exec", "-s", "read-only", "--effort", effort, prompt],
+                cmd,
                 capture_output=True, text=True, timeout=120,
             )
-            if result.returncode == 0 and result.stdout.strip():
-                return result.stdout.strip()
+            if result.returncode == 0 and os.path.exists(out_path):
+                with open(out_path, encoding="utf-8") as f:
+                    content = f.read().strip()
+                os.unlink(out_path)
+                if content:
+                    return content
+            else:
+                os.unlink(out_path) if os.path.exists(out_path) else None
+
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
         except subprocess.TimeoutExpired:
+            os.unlink(out_path) if os.path.exists(out_path) else None
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
 

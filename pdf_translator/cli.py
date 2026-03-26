@@ -60,7 +60,7 @@ def run(cfg: TranslatorConfig) -> None:
         console=console,
     ) as progress:
         task = progress.add_task("Extracting PDF...", total=4)
-        elements = extract_pdf(str(input_path), pages=cfg.pages)
+        elements = extract_pdf(str(input_path), output_dir=str(output_dir), pages=cfg.pages)
         console.print(f"  Extracted [cyan]{len(elements)}[/cyan] text elements")
         progress.update(task, advance=1)
 

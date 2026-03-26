@@ -36,13 +36,17 @@ def parse_codex_response(response: str, count: int) -> list[str]:
     response = response.strip()
 
     try:
-        if response.startswith("```"):
-            lines = response.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].startswith("```"):
-                lines = lines[:-1]
-            response = "\n".join(lines)
+        # Strip code fences anywhere in response
+        import re
+        fence_match = re.search(r"```(?:json)?\s*\n(.*?)```", response, re.DOTALL)
+        if fence_match:
+            response = fence_match.group(1).strip()
+
+        # Try to extract JSON array from anywhere in the response
+        bracket_start = response.find("[")
+        bracket_end = response.rfind("]")
+        if bracket_start >= 0 and bracket_end > bracket_start:
+            response = response[bracket_start:bracket_end + 1]
 
         data = json.loads(response)
         if isinstance(data, list):

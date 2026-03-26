@@ -9,9 +9,15 @@ HEADING_LEVELS = {
 }
 
 
+def _escape_cell(text: str) -> str:
+    """Escape pipe characters and normalize newlines for GFM table cells."""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 def _render_table(rows: list[list[str]]) -> list[str]:
     if not rows:
         return []
+    rows = [[_escape_cell(cell) for cell in row] for row in rows]
     num_cols = max(len(r) for r in rows)
     widths = [0] * num_cols
     for row in rows:

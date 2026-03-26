@@ -3,9 +3,9 @@
   "active": true,
   "skill": "ultrawork",
   "keyword": "parallel",
-  "phase": "executing",
+  "phase": "reviewing",
   "activated_at": "2026-03-26T17:53:37.264Z",
-  "updated_at": "2026-03-26T17:53:37.268Z",
+  "updated_at": "2026-03-26T18:02:45.322Z",
   "source": "keyword-detector",
   "input_lock": null
 }

@@ -38,16 +38,24 @@ def parse_codex_response(response: str, count: int) -> list[str]:
     try:
         if response.startswith("```"):
             lines = response.split("\n")
-            response = "\n".join(
-                l for l in lines if not l.startswith("```")
-            )
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            response = "\n".join(lines)
 
         data = json.loads(response)
         if isinstance(data, list):
             if data and isinstance(data[0], dict):
-                sorted_items = sorted(data, key=lambda x: x.get("index", 0))
-                return [item.get("text", "") for item in sorted_items]
-            return [str(item) for item in data]
+                # Map by explicit index into fixed-size result array
+                result = [None] * count
+                for item in data:
+                    idx = item.get("index", -1)
+                    text = item.get("text", "")
+                    if 0 <= idx < count and text:
+                        result[idx] = text
+                return result
+            return [str(item) if item else None for item in data][:count]
     except (json.JSONDecodeError, KeyError):
         pass
 
@@ -55,7 +63,8 @@ def parse_codex_response(response: str, count: int) -> list[str]:
     if len(lines) >= count:
         return lines[:count]
 
-    return lines + [""] * (count - len(lines))
+    # Pad with None (failure) for missing items
+    return lines + [None] * (count - len(lines))
 
 
 def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:

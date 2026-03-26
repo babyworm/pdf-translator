@@ -65,24 +65,33 @@ def run(cfg: TranslatorConfig) -> None:
         progress.update(task, advance=1)
 
         progress.update(task, description="Building batches...")
+        # Track original indices for elements that enter batches
+        valid_indices = [i for i, el in enumerate(elements) if el.content.strip()]
         batches = build_batches(elements)
         console.print(f"  Created [cyan]{len(batches)}[/cyan] translation batches")
         progress.update(task, advance=1)
 
         progress.update(task, description=f"Translating ({cfg.workers} workers)...")
+        workers = max(1, cfg.workers)
         cache = None
         try:
             if cfg.use_cache:
                 cache = TranslationCache(output_dir / "cache.db")
 
-            translations = translate_all(
+            raw_translations = translate_all(
                 batches,
                 source_lang=cfg.source_lang,
                 target_lang=cfg.target_lang,
                 effort=cfg.effort,
-                workers=cfg.workers,
+                workers=workers,
                 cache=cache,
             )
+            # Remap batch-local indices to original element indices
+            translations = {
+                valid_indices[gi]: text
+                for gi, text in raw_translations.items()
+                if gi < len(valid_indices)
+            }
             console.print(f"  Translated [cyan]{len(translations)}[/cyan] segments")
             progress.update(task, advance=1)
 

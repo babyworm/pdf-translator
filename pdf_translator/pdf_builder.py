@@ -76,28 +76,33 @@ def build_pdf(
             translated = translations[idx]
             fontsize = _fit_fontsize(translated, rect, el.font_size)
 
+            inserted = False
+            # Try insert_textbox first (handles wrapping)
             try:
+                kwargs = {"fontsize": fontsize}
                 if cjk_font:
-                    page.insert_text(
-                        rect.tl + fitz.Point(0, fontsize),
-                        translated,
-                        fontsize=fontsize,
-                        fontfile=cjk_font,
-                        fontname="CJK",
-                    )
-                else:
-                    page.insert_text(
-                        rect.tl + fitz.Point(0, fontsize),
-                        translated,
-                        fontsize=fontsize,
-                        fontname="china-s",
-                    )
+                    kwargs.update(fontfile=cjk_font, fontname="CJK")
+                rc = page.insert_textbox(rect, translated, **kwargs)
+                if rc >= 0:
+                    inserted = True
             except Exception:
-                page.insert_text(
-                    rect.tl + fitz.Point(0, fontsize),
-                    translated,
-                    fontsize=fontsize,
-                )
+                pass
+
+            # Fallback to insert_text if textbox failed
+            if not inserted:
+                try:
+                    kwargs = {"fontsize": fontsize}
+                    if cjk_font:
+                        kwargs.update(fontfile=cjk_font, fontname="CJK")
+                    page.insert_text(
+                        rect.tl + fitz.Point(0, fontsize),
+                        translated, **kwargs,
+                    )
+                except Exception:
+                    page.insert_text(
+                        rect.tl + fitz.Point(0, fontsize),
+                        translated, fontsize=fontsize,
+                    )
 
     doc.save(dst_path)
     doc.close()

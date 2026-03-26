@@ -31,6 +31,13 @@ def test_parse_codex_response_json():
     assert results == ["안녕하세요", "세계"]
 
 
+def test_parse_codex_response_json_undersized():
+    """Missing items should be None, not empty strings."""
+    response = json.dumps([{"index": 0, "text": "안녕하세요"}])
+    results = parse_codex_response(response, count=3)
+    assert results == ["안녕하세요", None, None]
+
+
 def test_parse_codex_response_fallback():
     response = "안녕하세요\n세계"
     results = parse_codex_response(response, count=2)

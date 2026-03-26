@@ -72,7 +72,11 @@ def _collect(node: dict, out: list[Element]) -> None:
 def extract_pdf(pdf_path: str, output_dir: str | None = None, pages: str | None = None) -> list[Element]:
     import opendataloader_pdf
 
-    work_dir = output_dir or tempfile.mkdtemp(prefix="pdf_translator_")
+    if output_dir:
+        # Use a fresh subdirectory to avoid stale JSON from previous runs
+        work_dir = tempfile.mkdtemp(prefix="pdf_extract_", dir=output_dir)
+    else:
+        work_dir = tempfile.mkdtemp(prefix="pdf_translator_")
     convert_args = dict(
         input_path=pdf_path,
         output_dir=work_dir,

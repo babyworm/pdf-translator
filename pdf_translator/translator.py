@@ -93,7 +93,7 @@ def parse_codex_response(response: str, count: int) -> list[str]:
             while len(result) < count:
                 result.append(None)
             return result[:count]
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         pass
 
     lines = [l.strip() for l in response.strip().split("\n") if l.strip()]
@@ -226,7 +226,7 @@ def translate_all(
         batch_items: list[dict] = []
         for el in batch:
             cached_text = cache.get(el.content, source_lang, target_lang) if cache else None
-            if cached_text:
+            if cached_text is not None:
                 results[global_idx] = cached_text
             else:
                 all_cached = False

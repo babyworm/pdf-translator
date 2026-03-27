@@ -133,12 +133,17 @@ def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
 
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
-        except subprocess.TimeoutExpired:
+        except (subprocess.TimeoutExpired, OSError):
             os.unlink(out_path) if os.path.exists(out_path) else None
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
 
     return ""
+
+
+def _normalize_lang(code: str) -> str:
+    """Normalize language codes: 'zh-cn' -> 'zh', 'en-US' -> 'en'."""
+    return code.split("-")[0].split("_")[0].lower()
 
 
 def _translate_batch_google(
@@ -150,8 +155,10 @@ def _translate_batch_google(
     except ImportError:
         return [None] * len(batch)
 
-    src = _GOOGLE_LANG_MAP.get(source_lang, source_lang)
-    tgt = _GOOGLE_LANG_MAP.get(target_lang, target_lang)
+    src = _normalize_lang(source_lang)
+    tgt = _normalize_lang(target_lang)
+    src = _GOOGLE_LANG_MAP.get(src, src)
+    tgt = _GOOGLE_LANG_MAP.get(tgt, tgt)
     translator = GoogleTranslator(source=src, target=tgt)
 
     results: list[str | None] = []
@@ -172,13 +179,13 @@ def translate_batch(
     target_lang: str,
     effort: str = "low",
 ) -> list[str | None]:
-    """Translate a batch. Uses Codex CLI if available, otherwise Google Translate."""
+    """Translate a batch. Tries Codex CLI first, falls back to Google Translate."""
     if is_codex_available():
         prompt = build_prompt(batch, source_lang, target_lang)
         response = _run_codex(prompt, effort)
-        if not response:
-            return [None] * len(batch)
-        return parse_codex_response(response, count=len(batch))
+        if response:
+            return parse_codex_response(response, count=len(batch))
+        # Codex failed at runtime — fall through to Google
     return _translate_batch_google(batch, source_lang, target_lang)
 
 

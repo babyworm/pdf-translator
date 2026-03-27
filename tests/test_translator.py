@@ -55,10 +55,12 @@ def test_translate_batch_calls_codex():
         assert results == ["안녕하세요"]
 
 
-def test_translate_batch_returns_none_on_failure():
+def test_translate_batch_returns_none_on_total_failure():
+    """Both Codex and Google fail → None results."""
     batch = [_el("Hello"), _el("World")]
 
-    with patch("pdf_translator.translator._run_codex", return_value=""):
+    with patch("pdf_translator.translator._run_codex", return_value=""), \
+         patch("pdf_translator.translator._translate_batch_google", return_value=[None, None]):
         results = translate_batch(batch, "en", "ko", effort="low")
         assert results == [None, None]
 
@@ -102,3 +104,34 @@ def test_translate_batch_google_fallback():
         results = translate_batch(batch, "en", "ko")
         mock_g.assert_called_once()
         assert results == ["안녕"]
+
+
+def test_translate_batch_codex_failure_falls_back_to_google():
+    """When codex is available but fails, translate_batch should fall back to Google."""
+    batch = [_el("Hello")]
+    with patch("pdf_translator.translator.is_codex_available", return_value=True), \
+         patch("pdf_translator.translator._run_codex", return_value=""), \
+         patch("pdf_translator.translator._translate_batch_google", return_value=["안녕"]) as mock_g:
+        results = translate_batch(batch, "en", "ko")
+        mock_g.assert_called_once()
+        assert results == ["안녕"]
+
+
+def test_translate_batch_google_partial_failure():
+    """Google Translate returns None for failed items."""
+    from pdf_translator.translator import _translate_batch_google
+    batch = [_el("Hello"), _el("World")]
+    with patch("deep_translator.GoogleTranslator") as MockGT:
+        instance = MockGT.return_value
+        instance.translate.side_effect = ["안녕", Exception("rate limit")]
+        results = _translate_batch_google(batch, "en", "ko")
+        assert results[0] == "안녕"
+        assert results[1] is None
+
+
+def test_normalize_lang():
+    from pdf_translator.translator import _normalize_lang
+    assert _normalize_lang("zh-CN") == "zh"
+    assert _normalize_lang("en-US") == "en"
+    assert _normalize_lang("ko") == "ko"
+    assert _normalize_lang("en_GB") == "en"

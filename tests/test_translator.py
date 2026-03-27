@@ -135,3 +135,5 @@ def test_normalize_lang():
     assert _normalize_lang("en-US") == "en"
     assert _normalize_lang("ko") == "ko"
     assert _normalize_lang("en_GB") == "en"
+    assert _normalize_lang(" en-US ") == "en"
+    assert _normalize_lang("  zh_CN  ") == "zh"

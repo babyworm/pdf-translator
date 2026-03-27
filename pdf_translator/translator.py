@@ -106,6 +106,7 @@ def parse_codex_response(response: str, count: int) -> list[str]:
 
 def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
     for attempt in range(max_retries + 1):
+        out_path = None
         try:
             import tempfile, os
             out_file = tempfile.NamedTemporaryFile(
@@ -134,7 +135,8 @@ def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
         except (subprocess.TimeoutExpired, OSError):
-            os.unlink(out_path) if os.path.exists(out_path) else None
+            if out_path and os.path.exists(out_path):
+                os.unlink(out_path)
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
 
@@ -143,7 +145,7 @@ def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
 
 def _normalize_lang(code: str) -> str:
     """Normalize language codes: 'zh-cn' -> 'zh', 'en-US' -> 'en'."""
-    return code.split("-")[0].split("_")[0].lower()
+    return code.strip().split("-")[0].split("_")[0].lower()
 
 
 def _translate_batch_google(

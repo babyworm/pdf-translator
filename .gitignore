@@ -5,4 +5,8 @@ dist/
 build/
 output/
 *.db
+.venv/
 .omc/
+.omx/
+.rtl-agent-team/
+.rat/

@@ -1,4 +1,5 @@
 """Tests for CLI argument parsing and pipeline orchestration."""
+import os
 import sys
 import pytest
 from pdf_translator.cli import parse_args
@@ -8,8 +9,8 @@ def test_parse_args_minimal():
     cfg = parse_args(["input.pdf"])
     assert cfg.input_path == "input.pdf"
     assert cfg.output_dir == "./output"
-    assert cfg.workers == 4
-    assert cfg.source_lang == "en"
+    assert cfg.workers == min(os.cpu_count() or 4, 8)
+    assert cfg.source_lang == "auto"
     assert cfg.target_lang == "ko"
     assert cfg.effort == "low"
     assert cfg.pages is None

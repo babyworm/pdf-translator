@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import time
 from multiprocessing import Pool
@@ -14,6 +15,34 @@ LANG_NAMES = {
     "zh": "Chinese", "de": "German", "fr": "French",
     "es": "Spanish", "pt": "Portuguese", "it": "Italian",
 }
+
+# Google Translate uses slightly different codes for some languages
+_GOOGLE_LANG_MAP = {
+    "zh": "zh-CN",
+}
+
+_codex_available: bool | None = None
+
+
+def is_codex_available() -> bool:
+    global _codex_available
+    if _codex_available is None:
+        _codex_available = shutil.which("codex") is not None
+    return _codex_available
+
+
+def detect_language(elements: list[Element]) -> str:
+    """Detect source language from extracted elements."""
+    from langdetect import detect, LangDetectException
+
+    text = " ".join(el.content for el in elements if el.content.strip())[:3000]
+    if not text.strip():
+        return "en"
+    try:
+        lang = detect(text)
+        return lang.split("-")[0]  # normalize 'zh-cn' -> 'zh'
+    except LangDetectException:
+        return "en"
 
 
 def build_prompt(batch: list[Element], source_lang: str, target_lang: str) -> str:
@@ -112,18 +141,45 @@ def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
     return ""
 
 
+def _translate_batch_google(
+    batch: list[Element], source_lang: str, target_lang: str,
+) -> list[str | None]:
+    """Translate a batch using Google Translate (fallback)."""
+    try:
+        from deep_translator import GoogleTranslator
+    except ImportError:
+        return [None] * len(batch)
+
+    src = _GOOGLE_LANG_MAP.get(source_lang, source_lang)
+    tgt = _GOOGLE_LANG_MAP.get(target_lang, target_lang)
+    translator = GoogleTranslator(source=src, target=tgt)
+
+    results: list[str | None] = []
+    for el in batch:
+        if not el.content.strip():
+            results.append(el.content)
+            continue
+        try:
+            results.append(translator.translate(el.content))
+        except Exception:
+            results.append(None)
+    return results
+
+
 def translate_batch(
     batch: list[Element],
     source_lang: str,
     target_lang: str,
     effort: str = "low",
 ) -> list[str | None]:
-    """Translate a batch. Returns None for items that failed (codex failure)."""
-    prompt = build_prompt(batch, source_lang, target_lang)
-    response = _run_codex(prompt, effort)
-    if not response:
-        return [None] * len(batch)  # signal failure, don't return originals
-    return parse_codex_response(response, count=len(batch))
+    """Translate a batch. Uses Codex CLI if available, otherwise Google Translate."""
+    if is_codex_available():
+        prompt = build_prompt(batch, source_lang, target_lang)
+        response = _run_codex(prompt, effort)
+        if not response:
+            return [None] * len(batch)
+        return parse_codex_response(response, count=len(batch))
+    return _translate_batch_google(batch, source_lang, target_lang)
 
 
 def _worker_translate(

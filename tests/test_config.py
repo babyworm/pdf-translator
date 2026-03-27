@@ -1,4 +1,5 @@
 # tests/test_config.py
+import os
 from pdf_translator.config import TranslatorConfig
 
 
@@ -6,8 +7,8 @@ def test_default_config():
     cfg = TranslatorConfig(input_path="test.pdf")
     assert cfg.input_path == "test.pdf"
     assert cfg.output_dir == "./output"
-    assert cfg.workers == 4
-    assert cfg.source_lang == "en"
+    assert cfg.workers == min(os.cpu_count() or 4, 8)
+    assert cfg.source_lang == "auto"
     assert cfg.target_lang == "ko"
     assert cfg.effort == "low"
     assert cfg.pages is None

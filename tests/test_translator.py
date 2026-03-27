@@ -5,6 +5,8 @@ from pdf_translator.translator import (
     build_prompt,
     parse_codex_response,
     translate_batch,
+    detect_language,
+    is_codex_available,
 )
 
 
@@ -59,3 +61,44 @@ def test_translate_batch_returns_none_on_failure():
     with patch("pdf_translator.translator._run_codex", return_value=""):
         results = translate_batch(batch, "en", "ko", effort="low")
         assert results == [None, None]
+
+
+def test_detect_language_english():
+    elements = [_el("This is a sample English paragraph for detection.")]
+    assert detect_language(elements) == "en"
+
+
+def test_detect_language_korean():
+    elements = [_el("이것은 한국어 텍스트 샘플입니다. 언어 감지를 테스트합니다.")]
+    assert detect_language(elements) == "ko"
+
+
+def test_detect_language_empty_fallback():
+    elements = [_el(""), _el("   ")]
+    assert detect_language(elements) == "en"
+
+
+def test_is_codex_available_found():
+    with patch("pdf_translator.translator.shutil.which", return_value="/usr/bin/codex"):
+        import pdf_translator.translator as t
+        t._codex_available = None  # reset cache
+        assert is_codex_available() is True
+        t._codex_available = None  # cleanup
+
+
+def test_is_codex_available_not_found():
+    with patch("pdf_translator.translator.shutil.which", return_value=None):
+        import pdf_translator.translator as t
+        t._codex_available = None
+        assert is_codex_available() is False
+        t._codex_available = None
+
+
+def test_translate_batch_google_fallback():
+    """When codex is unavailable, translate_batch should use Google Translate."""
+    batch = [_el("Hello")]
+    with patch("pdf_translator.translator.is_codex_available", return_value=False), \
+         patch("pdf_translator.translator._translate_batch_google", return_value=["안녕"]) as mock_g:
+        results = translate_batch(batch, "en", "ko")
+        mock_g.assert_called_once()
+        assert results == ["안녕"]

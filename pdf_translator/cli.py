@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from pdf_translator.config import TranslatorConfig
 from pdf_translator.extractor import extract_pdf
 from pdf_translator.chunker import build_batches
 from pdf_translator.cache import TranslationCache
-from pdf_translator.translator import translate_all
+from pdf_translator.translator import translate_all, detect_language, is_codex_available, LANG_NAMES
 from pdf_translator.pdf_builder import build_pdf
 from pdf_translator.md_builder import build_markdown
 
@@ -25,8 +26,9 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
     )
     parser.add_argument("input", help="Input PDF file path")
     parser.add_argument("--output-dir", default="./output", help="Output directory")
-    parser.add_argument("--workers", type=int, default=4, help="Parallel processes")
-    parser.add_argument("--source-lang", default="en", help="Source language code")
+    default_workers = min(os.cpu_count() or 4, 8)
+    parser.add_argument("--workers", type=int, default=default_workers, help="Parallel processes")
+    parser.add_argument("--source-lang", default="auto", help="Source language (auto: detect)")
     parser.add_argument("--target-lang", default="ko", help="Target language code")
     parser.add_argument("--effort", default="low", help="Codex reasoning effort")
     parser.add_argument("--pages", default=None, help="Pages to process (e.g. 1,3,5-7)")
@@ -62,6 +64,14 @@ def run(cfg: TranslatorConfig) -> None:
         task = progress.add_task("Extracting PDF...", total=4)
         elements = extract_pdf(str(input_path), output_dir=str(output_dir), pages=cfg.pages)
         console.print(f"  Extracted [cyan]{len(elements)}[/cyan] text elements")
+
+        if cfg.source_lang == "auto":
+            cfg.source_lang = detect_language(elements)
+            lang_label = LANG_NAMES.get(cfg.source_lang, cfg.source_lang)
+            console.print(f"  Detected language: [cyan]{lang_label}[/cyan]")
+
+        backend = "Codex CLI" if is_codex_available() else "Google Translate"
+        console.print(f"  Backend: [cyan]{backend}[/cyan]")
         progress.update(task, advance=1)
 
         progress.update(task, description="Building batches...")

@@ -10,6 +10,8 @@ dependencies = [
     "opendataloader-pdf>=0.3",
     "PyMuPDF>=1.24",
     "rich>=13.0",
+    "langdetect>=1.0.9",
+    "deep-translator>=1.11",
 ]
 
 [project.scripts]

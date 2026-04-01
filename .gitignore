@@ -11,3 +11,4 @@ output/
 .rtl-agent-team/
 .rat/
 .claude/worktrees/
+node_modules/

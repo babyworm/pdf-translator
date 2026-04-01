@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from pdf_translator.extractor import Element, parse_elements, extract_pdf
+from pdf_translator.core.extractor import Element, parse_elements, extract_pdf
 
 
 def test_element_creation():

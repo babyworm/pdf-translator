@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-from pdf_translator.cache import TranslationCache
+from pdf_translator.core.cache import TranslationCache
 
 
 def test_cache_miss():
@@ -31,6 +31,7 @@ def test_cache_persistence():
         db_path = Path(d) / "cache.db"
         cache1 = TranslationCache(db_path)
         cache1.put("test", "en", "ko", "테스트")
+        cache1.flush()
         cache1.close()
 
         cache2 = TranslationCache(db_path)

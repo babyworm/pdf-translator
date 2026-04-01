@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import shutil
 import subprocess
+import tempfile
 import time
 from multiprocessing import Pool
 from functools import partial
 
 from pdf_translator.extractor import Element
 
+logger = logging.getLogger(__name__)
 
 LANG_NAMES = {
     "en": "English", "ko": "Korean", "ja": "Japanese",
@@ -21,14 +25,9 @@ _GOOGLE_LANG_MAP = {
     "zh": "zh-CN",
 }
 
-_codex_available: bool | None = None
-
 
 def is_codex_available() -> bool:
-    global _codex_available
-    if _codex_available is None:
-        _codex_available = shutil.which("codex") is not None
-    return _codex_available
+    return shutil.which("codex") is not None
 
 
 def detect_language(elements: list[Element]) -> str:
@@ -87,19 +86,27 @@ def parse_codex_response(response: str, count: int) -> list[str]:
                     text = item.get("text", "")
                     if 0 <= idx < count and text:
                         result[idx] = text
+                missing = sum(1 for r in result if r is None)
+                if missing:
+                    logger.warning("Codex response missing %d/%d items", missing, count)
                 return result
             result = [str(item) if item else None for item in data]
+            if len(result) < count:
+                logger.warning(
+                    "Codex response has %d items, expected %d", len(result), count,
+                )
             # Pad to exact count
             while len(result) < count:
                 result.append(None)
             return result[:count]
-    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        pass
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        logger.warning("Failed to parse Codex response: %s", exc)
 
     lines = [l.strip() for l in response.strip().split("\n") if l.strip()]
     if len(lines) >= count:
         return lines[:count]
 
+    logger.warning("Codex response has %d lines, expected %d", len(lines), count)
     # Pad with None (failure) for missing items
     return lines + [None] * (count - len(lines))
 
@@ -108,7 +115,6 @@ def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
     for attempt in range(max_retries + 1):
         out_path = None
         try:
-            import tempfile, os
             out_file = tempfile.NamedTemporaryFile(
                 mode="w", suffix=".txt", delete=False, prefix="codex_out_",
             )
@@ -118,23 +124,38 @@ def _run_codex(prompt: str, effort: str, max_retries: int = 2) -> str:
             cmd = ["codex", "exec", "-s", "read-only", "-o", out_path]
             if effort:
                 cmd += ["-c", f"reasoning_effort={effort}"]
-            cmd.append(prompt)
-            result = subprocess.run(
-                cmd,
-                capture_output=True, text=True, timeout=120,
+
+            proc = subprocess.Popen(
+                cmd, stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                text=True,
             )
-            if result.returncode == 0 and os.path.exists(out_path):
+            try:
+                stdout, stderr = proc.communicate(input=prompt, timeout=120)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+                raise
+
+            if proc.returncode == 0 and os.path.exists(out_path):
                 with open(out_path, encoding="utf-8") as f:
                     content = f.read().strip()
                 os.unlink(out_path)
                 if content:
                     return content
             else:
-                os.unlink(out_path) if os.path.exists(out_path) else None
+                if os.path.exists(out_path):
+                    os.unlink(out_path)
 
             if attempt < max_retries:
                 time.sleep(min(0.5 * (2 ** attempt), 4.0))
-        except (subprocess.TimeoutExpired, OSError):
+        except subprocess.TimeoutExpired:
+            if out_path and os.path.exists(out_path):
+                os.unlink(out_path)
+            logger.warning("Codex timed out (attempt %d/%d)", attempt + 1, max_retries + 1)
+            if attempt < max_retries:
+                time.sleep(min(0.5 * (2 ** attempt), 4.0))
+        except OSError:
             if out_path and os.path.exists(out_path):
                 os.unlink(out_path)
             if attempt < max_retries:
@@ -180,9 +201,11 @@ def translate_batch(
     source_lang: str,
     target_lang: str,
     effort: str = "low",
+    use_codex: bool | None = None,
 ) -> list[str | None]:
     """Translate a batch. Tries Codex CLI first, falls back to Google Translate."""
-    if is_codex_available():
+    codex = use_codex if use_codex is not None else is_codex_available()
+    if codex:
         prompt = build_prompt(batch, source_lang, target_lang)
         response = _run_codex(prompt, effort)
         if response:
@@ -192,20 +215,27 @@ def translate_batch(
 
 
 def _worker_translate(
-    work_item: tuple[list[dict], str, str, str],
+    work_item: tuple[list[dict], str, str, str, bool],
 ) -> list[tuple[int, str, str]]:
-    items, source_lang, target_lang, effort = work_item
+    items, source_lang, target_lang, effort, use_codex = work_item
+
+    # Separate cached and uncached items
+    uncached_items = [d for d in items if not d["cached"]]
+
+    if not uncached_items:
+        return []
+
     elements = [
         Element(
             type=d["type"], content=d["content"], page_number=d["page_number"],
             bbox=d["bbox"],
         )
-        for d in items
+        for d in uncached_items
     ]
-    translations = translate_batch(elements, source_lang, target_lang, effort)
+    translations = translate_batch(elements, source_lang, target_lang, effort, use_codex)
     return [
         (item["global_idx"], translated, item["content"])
-        for item, translated in zip(items, translations)
+        for item, translated in zip(uncached_items, translations)
     ]
 
 
@@ -218,8 +248,9 @@ def translate_all(
     cache=None,
 ) -> dict[int, str]:
     results: dict[int, str] = {}
-    work_items: list[tuple[list[dict], str, str, str]] = []
+    work_items: list[tuple[list[dict], str, str, str, bool]] = []
     global_idx = 0
+    use_codex = is_codex_available()
 
     for batch in batches:
         all_cached = True
@@ -237,9 +268,8 @@ def translate_all(
                 "cached": cached_text is not None,
             })
             global_idx += 1
-        # Send entire batch to codex if any item is uncached (preserve context)
         if not all_cached:
-            work_items.append((batch_items, source_lang, target_lang, effort))
+            work_items.append((batch_items, source_lang, target_lang, effort, use_codex))
 
     if not work_items:
         return results
@@ -253,7 +283,7 @@ def translate_all(
                     if cache:
                         cache.put(original, source_lang, target_lang, translated)
                 elif gidx not in results:
-                    # Codex failed and no cache hit: fallback to original
+                    # Translation failed and no cache hit: fallback to original
                     results[gidx] = original
 
     return results

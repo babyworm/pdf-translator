@@ -1,6 +1,6 @@
 # tests/test_config.py
 import os
-from pdf_translator.config import TranslatorConfig
+from pdf_translator.core.config import TranslatorConfig
 
 
 def test_default_config():

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from pdf_translator.extractor import Element
+from pdf_translator.core.extractor import Element
 
 CJK_FONT_PATHS = [
     # macOS
@@ -56,12 +56,17 @@ def _cjk_font_kwargs(text: str, cjk_font_file: str | None) -> dict:
 
 
 def _fit_fontsize(text: str, rect: fitz.Rect, max_size: float) -> float:
+    import math
     lo, hi = 4.0, max_size
     for _ in range(10):
         mid = (lo + hi) / 2
         # CJK chars are roughly full-width (~1.0), Latin ~0.6
         estimated_width = sum(mid * (1.0 if _is_cjk(ch) else 0.6) for ch in text)
-        if estimated_width <= rect.width:
+        num_lines = math.ceil(estimated_width / rect.width) if rect.width > 0 else 1
+        estimated_height = num_lines * mid * 1.2  # 1.2 = line spacing factor
+        fits_width = estimated_width <= rect.width or num_lines > 1
+        fits_height = estimated_height <= rect.height
+        if fits_width and fits_height:
             lo = mid
         else:
             hi = mid
@@ -75,59 +80,60 @@ def build_pdf(
     translations: dict[int, str],
 ) -> None:
     doc = fitz.open(src_path)
+    try:
+        cjk_font = _find_cjk_font()
 
-    cjk_font = _find_cjk_font()
+        by_page: dict[int, list[tuple[int, Element]]] = {}
+        for idx, el in enumerate(elements):
+            if idx in translations:
+                by_page.setdefault(el.page_number, []).append((idx, el))
 
-    by_page: dict[int, list[tuple[int, Element]]] = {}
-    for idx, el in enumerate(elements):
-        if idx in translations:
-            by_page.setdefault(el.page_number, []).append((idx, el))
-
-    for page_num, items in by_page.items():
-        if page_num < 1 or page_num > len(doc):
-            continue
-        page = doc[page_num - 1]
-
-        for idx, el in items:
-            bbox = el.bbox
-            if len(bbox) != 4:
+        for page_num, items in by_page.items():
+            if page_num < 1 or page_num > len(doc):
                 continue
+            page = doc[page_num - 1]
 
-            page_height = page.rect.height
-            x0, y_bottom, x1, y_top = bbox
-            rect = fitz.Rect(x0, page_height - y_top, x1, page_height - y_bottom)
+            for idx, el in items:
+                bbox = el.bbox
+                if len(bbox) != 4:
+                    continue
 
-            shape = page.new_shape()
-            shape.draw_rect(rect)
-            shape.finish(color=None, fill=(1, 1, 1))
-            shape.commit()
+                page_height = page.rect.height
+                x0, y_bottom, x1, y_top = bbox
+                rect = fitz.Rect(x0, page_height - y_top, x1, page_height - y_bottom)
 
-            translated = translations[idx]
-            fontsize = _fit_fontsize(translated, rect, el.font_size)
+                shape = page.new_shape()
+                shape.draw_rect(rect)
+                shape.finish(color=None, fill=(1, 1, 1))
+                shape.commit()
 
-            inserted = False
-            try:
-                kwargs = {"fontsize": fontsize}
-                kwargs.update(_cjk_font_kwargs(translated, cjk_font))
-                rc = page.insert_textbox(rect, translated, **kwargs)
-                if rc >= 0:
-                    inserted = True
-            except Exception:
-                pass
+                translated = translations[idx]
+                fontsize = _fit_fontsize(translated, rect, el.font_size)
 
-            if not inserted:
+                inserted = False
                 try:
                     kwargs = {"fontsize": fontsize}
                     kwargs.update(_cjk_font_kwargs(translated, cjk_font))
-                    page.insert_text(
-                        rect.tl + fitz.Point(0, fontsize),
-                        translated, **kwargs,
-                    )
+                    rc = page.insert_textbox(rect, translated, **kwargs)
+                    if rc >= 0:
+                        inserted = True
                 except Exception:
-                    page.insert_text(
-                        rect.tl + fitz.Point(0, fontsize),
-                        translated, fontsize=fontsize,
-                    )
+                    pass
 
-    doc.save(dst_path)
-    doc.close()
+                if not inserted:
+                    try:
+                        kwargs = {"fontsize": fontsize}
+                        kwargs.update(_cjk_font_kwargs(translated, cjk_font))
+                        page.insert_text(
+                            rect.tl + fitz.Point(0, fontsize),
+                            translated, **kwargs,
+                        )
+                    except Exception:
+                        page.insert_text(
+                            rect.tl + fitz.Point(0, fontsize),
+                            translated, fontsize=fontsize,
+                        )
+
+        doc.save(dst_path)
+    finally:
+        doc.close()

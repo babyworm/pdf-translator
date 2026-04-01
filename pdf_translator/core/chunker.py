@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pdf_translator.extractor import Element
+from pdf_translator.core.extractor import Element
 
 
 def build_batches(

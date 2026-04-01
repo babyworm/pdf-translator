@@ -83,11 +83,8 @@ def run(cfg: TranslatorConfig) -> None:
 
         progress.update(task, description=f"Translating ({cfg.workers} workers)...")
         workers = max(1, cfg.workers)
-        cache = None
+        cache = TranslationCache(output_dir / "cache.db") if cfg.use_cache else None
         try:
-            if cfg.use_cache:
-                cache = TranslationCache(output_dir / "cache.db")
-
             raw_translations = translate_all(
                 batches,
                 source_lang=cfg.source_lang,
@@ -119,6 +116,7 @@ def run(cfg: TranslatorConfig) -> None:
             progress.update(task, advance=1)
         finally:
             if cache:
+                cache.flush()
                 cache.close()
 
     console.print("[bold green]Done![/bold green]")

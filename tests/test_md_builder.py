@@ -1,5 +1,5 @@
-from pdf_translator.extractor import Element
-from pdf_translator.md_builder import build_markdown
+from pdf_translator.core.extractor import Element
+from pdf_translator.core.md_builder import build_markdown
 
 
 def _el(type: str, content: str, level: str | None = None, page: int = 1) -> Element:

@@ -1,0 +1,112 @@
+<h2>PDF Translator v2 — 전체 아키텍처</h2>
+<p class="subtitle">코어 + 레이어 분리 (Approach B)</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">시스템 아키텍처</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 13px; line-height: 1.6; background: #1a1a2e; color: #e0e0e0;">
+      <pre style="margin:0; white-space:pre; overflow-x:auto;">
+┌─────────────────────────────────────────────────────────────────┐
+│                        Entry Points                             │
+│  ┌──────────┐   ┌──────────────────────┐   ┌────────────────┐  │
+│  │  CLI      │   │  Web UI (React SPA)  │   │  Python API    │  │
+│  │  thin     │   │  side-by-side view   │   │  import pdf_   │  │
+│  │  wrapper  │   │  inline edit         │   │  translator    │  │
+│  │          │   │  glossary mgmt       │   │               │  │
+│  └─────┬────┘   └─────────┬────────────┘   └──────┬─────────┘  │
+│        │                  │                        │            │
+│        │           ┌──────┴──────┐                 │            │
+│        │           │  FastAPI    │                 │            │
+│        │           │  REST API   │                 │            │
+│        │           │  WebSocket  │                 │            │
+│        │           └──────┬──────┘                 │            │
+│        └─────────────────┬┼────────────────────────┘            │
+│                          ││                                     │
+├──────────────────────────┼┼─────────────────────────────────────┤
+│                     CORE LIBRARY                                │
+│                          ││                                     │
+│  ┌───────────┐  ┌────────┴┴────────┐  ┌──────────────────────┐ │
+│  │ Extractor  │  │   Translator     │  │   Output Builders    │ │
+│  │            │  │                  │  │                      │ │
+│  │ PDF Parse ─┼──┤  Chunker         │  │  ┌───────────────┐  │ │
+│  │ OCR Pipe  │  │  Backend Router  ├──┤  │ PDF Builder v2 │  │ │
+│  │  ├ Surya  │  │  Glossary Inject │  │  │ (redaction API)│  │ │
+│  │  └ Tess.  │  │  Cache           │  │  ├───────────────┤  │ │
+│  │ Layout    │  │                  │  │  │ MD Builder     │  │ │
+│  │  Detect   │  └──────────────────┘  │  ├───────────────┤  │ │
+│  └───────────┘                        │  │ Draft (JSON)   │  │ │
+│                                       │  └───────────────┘  │ │
+│  ┌─────────────────────────────────┐  └──────────────────────┘ │
+│  │         Backend Plugins          │                           │
+│  │  ┌───────┐ ┌───────┐ ┌───────┐  │                           │
+│  │  │Codex  │ │Claude │ │Gemini │  │  ← CLI Backends (free)    │
+│  │  │CLI    │ │CLI    │ │CLI    │  │                           │
+│  │  ├───────┤ ├───────┤ ├───────┤  │                           │
+│  │  │OpenAI │ │Claude │ │Google │  │  ← API Backends (paid)    │
+│  │  │API    │ │API    │ │API    │  │                           │
+│  │  ├───────┤ ├───────┤         │  │                           │
+│  │  │Open   │ │Google │         │  │  ← Aggregators            │
+│  │  │Router │ │Trans. │         │  │                           │
+│  │  └───────┘ └───────┘ └───────┘  │                           │
+│  └─────────────────────────────────┘                           │
+│                                                                 │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
+│  │  Glossary     │  │  Cache       │  │  Config               │ │
+│  │  CSV/JSON     │  │  SQLite      │  │  YAML + env vars      │ │
+│  │  per-project  │  │  WAL mode    │  │  backend selection    │ │
+│  └──────────────┘  └──────────────┘  └───────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+      </pre>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>핵심 설계 원칙</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div style="background: rgba(99,102,241,0.1); padding: 16px; border-radius: 8px; border-left: 3px solid #6366f1;">
+      <strong>CLI = 무료 우선</strong><br>
+      <span style="color: #999; font-size: 13px;">Codex/Claude/Gemini CLI → Google Translate 폴백. API 키 없이 사용 가능</span>
+    </div>
+    <div style="background: rgba(16,185,129,0.1); padding: 16px; border-radius: 8px; border-left: 3px solid #10b981;">
+      <strong>Backend = Protocol</strong><br>
+      <span style="color: #999; font-size: 13px;">TranslationBackend 프로토콜 구현만으로 새 백엔드 추가. 파일 1개</span>
+    </div>
+    <div style="background: rgba(245,158,11,0.1); padding: 16px; border-radius: 8px; border-left: 3px solid #f59e0b;">
+      <strong>pip install 단계별</strong><br>
+      <span style="color: #999; font-size: 13px;">기본: CLI만 / [ocr]: Surya+Tess / [web]: FastAPI+React / [all]: 전체</span>
+    </div>
+    <div style="background: rgba(239,68,68,0.1); padding: 16px; border-radius: 8px; border-left: 3px solid #ef4444;">
+      <strong>레이아웃 = 최우선</strong><br>
+      <span style="color: #999; font-size: 13px;">Redaction API + insert_htmlbox + 폰트/색상 보존. 현재 대비 대폭 개선</span>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>데이터 흐름</h3>
+  <div class="mockup">
+    <div class="mockup-body" style="padding: 20px; font-family: monospace; font-size: 13px; background: #1a1a2e; color: #e0e0e0;">
+      <pre style="margin:0;">
+PDF ──→ Extractor ──→ Elements[] ──→ Chunker ──→ Batches[]
+  │      (+ OCR)        │                          │
+  │                     │              ┌───────────┘
+  │                     │              ▼
+  │                     │         Translator
+  │                     │          ├── Cache hit? → skip
+  │                     │          ├── Glossary inject → prompt
+  │                     │          └── Backend.translate()
+  │                     │              │
+  │                     │              ▼
+  │                     │         Draft (JSON) ←── Review Mode
+  │                     │              │               ↕
+  │                     ▼              ▼          Web UI Edit
+  │                Elements[] + Translations{}
+  │                     │              │
+  │                     ▼              ▼
+  └──────────→ PDF Builder v2    MD Builder
+               (redact+overlay)  (GFM output)
+      </pre>
+    </div>
+  </div>
+</div>

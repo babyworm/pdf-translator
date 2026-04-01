@@ -82,18 +82,12 @@ def test_detect_language_empty_fallback():
 
 def test_is_codex_available_found():
     with patch("pdf_translator.translator.shutil.which", return_value="/usr/bin/codex"):
-        import pdf_translator.translator as t
-        t._codex_available = None  # reset cache
         assert is_codex_available() is True
-        t._codex_available = None  # cleanup
 
 
 def test_is_codex_available_not_found():
     with patch("pdf_translator.translator.shutil.which", return_value=None):
-        import pdf_translator.translator as t
-        t._codex_available = None
         assert is_codex_available() is False
-        t._codex_available = None
 
 
 def test_translate_batch_google_fallback():

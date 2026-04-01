@@ -3,8 +3,8 @@ from pathlib import Path
 
 import fitz  # PyMuPDF
 
-from pdf_translator.extractor import Element
-from pdf_translator.pdf_builder import build_pdf, _builtin_cjk_fontname, _cjk_font_kwargs
+from pdf_translator.core.extractor import Element
+from pdf_translator.core.pdf_builder import build_pdf, _builtin_cjk_fontname, _cjk_font_kwargs
 
 
 def _create_test_pdf(path: str, text: str = "Hello World") -> None:

@@ -1,0 +1,39 @@
+source,target,rule
+DNA,DNA,keep
+RNA,RNA,keep
+mRNA,mRNA,keep
+COVID-19,COVID-19,keep
+SARS-CoV-2,SARS-CoV-2,keep
+PCR,PCR,keep
+CT,CT,keep
+MRI,MRI,keep
+ICU,ICU,keep
+WHO,WHO,keep
+FDA,FDA,keep
+BMI,BMI,keep
+ECG,ECG,keep
+EEG,EEG,keep
+HIV,HIV,keep
+HbA1c,HbA1c,keep
+p-value,p값,translate
+placebo,위약,translate
+cohort,코호트,translate
+randomized controlled trial,무작위 대조 시험,translate
+meta-analysis,메타분석,translate
+systematic review,체계적 문헌고찰,translate
+prevalence,유병률,translate
+incidence,발생률,translate
+mortality,사망률,translate
+morbidity,이환율,translate
+biomarker,바이오마커,translate
+phenotype,표현형,translate
+genotype,유전형,translate
+pathogenesis,병인,translate
+prognosis,예후,translate
+diagnosis,진단,translate
+etiology,병인론,translate
+comorbidity,동반질환,translate
+adverse event,이상반응,translate
+efficacy,유효성,translate
+pharmacokinetics,약동학,translate
+pharmacodynamics,약력학,translate

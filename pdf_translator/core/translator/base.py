@@ -98,7 +98,7 @@ def parse_response(response: str, count: int) -> list[str | None]:
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
         logger.warning("Failed to parse response: %s", exc)
 
-    lines = [l.strip() for l in response.strip().split("\n") if l.strip()]
+    lines = [line.strip() for line in response.strip().split("\n") if line.strip()]
     if len(lines) >= count:
         return lines[:count]
     return lines + [None] * (count - len(lines))

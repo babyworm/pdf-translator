@@ -1,6 +1,9 @@
-import json, os
+import json
+import os
 from unittest.mock import patch
+
 from pdf_translator.core.translator.backends.anthropic_api import AnthropicBackend
+
 
 def test_available_with_key():
     with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-test"}):

@@ -13,7 +13,7 @@ class GoogleTranslateBackend:
 
     def is_available(self) -> bool:
         try:
-            import deep_translator
+            import deep_translator  # noqa: F401
             return True
         except ImportError:
             return False

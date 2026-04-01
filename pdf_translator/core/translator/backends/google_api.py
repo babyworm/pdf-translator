@@ -1,7 +1,12 @@
 from __future__ import annotations
-import logging, os
+
+import logging
+import os
+
 import requests
+
 from pdf_translator.core.translator.base import build_prompt, parse_response
+
 logger = logging.getLogger(__name__)
 
 class GoogleAPIBackend:

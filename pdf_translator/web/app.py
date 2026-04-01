@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import csv
 import io
 import json
@@ -6,7 +7,7 @@ import shutil
 import threading
 from pathlib import Path
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -149,8 +150,8 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
                     output_dir=output_dir, glossary=glossary_dict,
                 )
                 # Save draft
-                from pdf_translator.core.extractor import extract_pdf
                 from pdf_translator.core.draft import Draft, DraftElement
+                from pdf_translator.core.extractor import extract_pdf
                 elements = extract_pdf(pdf_path, output_dir=output_dir)
                 draft_elements = []
                 for i, el in enumerate(elements):
@@ -167,7 +168,7 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
                 db.update_project(project_id, status="done",
                                   segments_total=result["segments_total"],
                                   segments_translated=result["segments_translated"])
-            except Exception as e:
+            except Exception:
                 db.update_project(project_id, status="error")
 
         thread = threading.Thread(target=run_translation, daemon=True)

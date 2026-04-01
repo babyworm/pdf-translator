@@ -71,6 +71,7 @@ def _collect(node: dict, out: list[Element]) -> None:
 
 def extract_pdf(pdf_path: str, output_dir: str | None = None, pages: str | None = None, ocr_engine=None) -> list[Element]:
     import shutil
+
     import opendataloader_pdf
 
     if output_dir:

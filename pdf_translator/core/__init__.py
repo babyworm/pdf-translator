@@ -3,15 +3,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pdf_translator.core.config import TranslatorConfig
-from pdf_translator.core.extractor import Element, extract_pdf
-from pdf_translator.core.chunker import build_batches
-from pdf_translator.core.cache import TranslationCache
-from pdf_translator.core.translator import translate_all, detect_language
-from pdf_translator.core.translator.router import BackendRouter
-from pdf_translator.core.pdf_builder import build_pdf
-from pdf_translator.core.md_builder import build_markdown
-from pdf_translator.core.glossary import load_glossary
+from pdf_translator.core.cache import TranslationCache as TranslationCache
+from pdf_translator.core.chunker import build_batches as build_batches
+from pdf_translator.core.config import TranslatorConfig as TranslatorConfig
+from pdf_translator.core.extractor import Element as Element
+from pdf_translator.core.extractor import extract_pdf as extract_pdf
+from pdf_translator.core.glossary import load_glossary as load_glossary
+from pdf_translator.core.md_builder import build_markdown as build_markdown
+from pdf_translator.core.pdf_builder import build_pdf as build_pdf
+from pdf_translator.core.translator import detect_language as detect_language
+from pdf_translator.core.translator import translate_all as translate_all
+from pdf_translator.core.translator.router import BackendRouter as BackendRouter
 
 
 def translate_pdf(

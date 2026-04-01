@@ -1,5 +1,4 @@
 """E2E test: real Google Translate API, mocked extractor (no Java needed)."""
-import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,7 +7,6 @@ import pytest
 
 from pdf_translator.core import translate_pdf
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.draft import Draft, DraftElement
 from pdf_translator.core.glossary import load_builtin_pack
 from pdf_translator.core.translator.backends.google_translate import GoogleTranslateBackend
 
@@ -114,7 +112,7 @@ class TestFullPipelineE2E:
                 glossary=glossary,
             )
 
-        md = Path(result["md_path"]).read_text(encoding="utf-8")
+        Path(result["md_path"]).read_text(encoding="utf-8")
         assert result["segments_translated"] >= 1
 
 

@@ -28,9 +28,10 @@ class TesseractOCREngine:
 
     def extract(self, page_image: bytes, lang: str = "en") -> list[OCRResult]:
         try:
+            import io
+
             import pytesseract
             from PIL import Image
-            import io
 
             image = Image.open(io.BytesIO(page_image))
             tess_lang = _LANG_MAP.get(lang, "eng")

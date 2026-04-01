@@ -1,11 +1,12 @@
 # tests/test_translator.py
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.translator.base import build_prompt, parse_response, LANG_NAMES
 from pdf_translator.core.translator import detect_language
 from pdf_translator.core.translator.backends.codex_cli import CodexCLIBackend
 from pdf_translator.core.translator.backends.google_translate import GoogleTranslateBackend
+from pdf_translator.core.translator.base import build_prompt, parse_response
 
 
 def _el(content: str) -> Element:

@@ -1,6 +1,7 @@
 import tempfile
-from pathlib import Path
+
 from pdf_translator.core.glossary import Glossary, load_builtin_pack, load_glossary
+
 
 def test_load_csv_2col():
     with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as f:
@@ -51,3 +52,25 @@ def test_load_glossary_dict():
 
 def test_load_glossary_none():
     assert load_glossary(None) is None
+
+
+def test_builtin_medical():
+    g = load_builtin_pack("medical")
+    assert g is not None
+    assert g.get("DNA") == "DNA"
+    assert g.get("placebo") == "위약"
+    assert "DNA" in g.keep_terms
+
+
+def test_builtin_legal():
+    g = load_builtin_pack("legal")
+    assert g is not None
+    assert g.get("GDPR") == "GDPR"
+    assert g.get("jurisdiction") == "관할권"
+
+
+def test_builtin_finance():
+    g = load_builtin_pack("finance")
+    assert g is not None
+    assert g.get("ETF") == "ETF"
+    assert g.get("dividend") == "배당"

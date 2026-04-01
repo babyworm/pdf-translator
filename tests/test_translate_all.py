@@ -1,8 +1,7 @@
 """Tests for translate_all with cache integration and index mapping."""
-import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.cache import TranslationCache
 from pdf_translator.core.translator import translate_all
 
 

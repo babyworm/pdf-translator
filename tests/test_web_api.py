@@ -1,7 +1,8 @@
-import pytest
+
 import fitz
-from pathlib import Path
+import pytest
 from fastapi.testclient import TestClient
+
 from pdf_translator.web.app import create_app
 
 

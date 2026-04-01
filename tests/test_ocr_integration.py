@@ -2,7 +2,6 @@ import tempfile
 from pathlib import Path
 
 import fitz
-import pytest
 
 from pdf_translator.core.extractor import Element, _ocr_fallback, _parse_pages
 from pdf_translator.ocr.base import OCRResult

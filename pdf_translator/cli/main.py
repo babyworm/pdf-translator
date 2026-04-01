@@ -277,9 +277,34 @@ def run(cfg: TranslatorConfig) -> None:
     console.print("[bold green]Done![/bold green]")
 
 
+def run_server(argv: list[str] | None = None):
+    import argparse
+    parser = argparse.ArgumentParser(prog="pdf-translator serve")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--data-dir", default="./pdf_translator_data")
+    args = parser.parse_args(argv)
+
+    try:
+        import uvicorn
+        from pdf_translator.web.app import create_app
+        app = create_app(data_dir=args.data_dir)
+        console.print(f"[bold green]Starting PDF Translator Web UI[/bold green]")
+        console.print(f"  URL: [cyan]http://{args.host}:{args.port}[/cyan]")
+        uvicorn.run(app, host=args.host, port=args.port)
+    except ImportError:
+        console.print("[red]Web UI requires additional dependencies. Install with:[/red]")
+        console.print("  pip install pdf-translator[web]")
+        sys.exit(1)
+
+
 def main():
-    cfg = parse_args()
-    run(cfg)
+    if len(sys.argv) > 1 and sys.argv[1] == "serve":
+        serve_args = sys.argv[2:]
+        run_server(serve_args)
+    else:
+        cfg = parse_args()
+        run(cfg)
 
 
 if __name__ == "__main__":

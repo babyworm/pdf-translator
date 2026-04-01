@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from pdf_translator.web.models import Database
@@ -262,5 +263,9 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
                 await websocket.receive_text()
         except WebSocketDisconnect:
             ws_manager.disconnect(project_id, websocket)
+
+    dist_dir = Path(__file__).parent / "frontend" / "dist"
+    if dist_dir.exists():
+        app.mount("/", StaticFiles(directory=str(dist_dir), html=True))
 
     return app

@@ -15,6 +15,11 @@ dependencies = [
     "requests>=2.28",
 ]
 
+[project.optional-dependencies]
+web = ["fastapi>=0.100", "uvicorn>=0.20", "python-multipart>=0.0.6"]
+ocr = ["surya-ocr>=0.4", "pytesseract>=0.3", "Pillow>=10.0"]
+all = ["pdf-translator[web]", "pdf-translator[ocr]"]
+
 [project.scripts]
 pdf-translator = "pdf_translator.cli.main:main"
 

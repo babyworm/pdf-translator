@@ -75,3 +75,10 @@ def test_parse_args_defaults_new_fields():
     assert cfg.build_from is None
     assert cfg.retranslate is None
     assert cfg.ocr_engine == "auto"
+
+
+def test_parse_args_serve_not_crash():
+    """Verify serve mode doesn't interfere with normal arg parsing."""
+    from pdf_translator.cli.main import parse_args
+    cfg = parse_args(["test.pdf"])
+    assert cfg.input_path == "test.pdf"

@@ -4,8 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-translator"
-version = "0.1.0"
+version = "2.0.0"
+description = "Translate PDF documents with pluggable LLM backends, preserving original layout"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [{name = "Hyun-Gyu Kim"}]
+keywords = ["pdf", "translation", "llm", "ocr", "cli"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+]
 dependencies = [
     "opendataloader-pdf>=0.3",
     "PyMuPDF>=1.24",
@@ -16,12 +32,26 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-web = ["fastapi>=0.100", "uvicorn>=0.20", "python-multipart>=0.0.6"]
 ocr = ["surya-ocr>=0.4", "pytesseract>=0.3", "Pillow>=10.0"]
-all = ["pdf-translator[web]", "pdf-translator[ocr]"]
+web = ["fastapi>=0.100", "uvicorn>=0.20", "python-multipart>=0.0.6"]
+all = ["pdf-translator[ocr]", "pdf-translator[web]"]
 
 [project.scripts]
 pdf-translator = "pdf_translator.cli.main:main"
+
+[project.urls]
+Homepage = "https://github.com/babyworm/pdf-translator"
+Repository = "https://github.com/babyworm/pdf-translator"
+Issues = "https://github.com/babyworm/pdf-translator/issues"
+
+[tool.setuptools.packages.find]
+include = ["pdf_translator*"]
+
+[tool.setuptools.package-data]
+"pdf_translator" = ["data/glossaries/*.csv", "web/frontend/dist/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.ruff]
 target-version = "py310"
@@ -29,7 +59,4 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = ["E501"]  # line length handled by formatter
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+ignore = ["E501"]

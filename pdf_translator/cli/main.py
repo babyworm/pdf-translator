@@ -277,6 +277,79 @@ def run(cfg: TranslatorConfig) -> None:
     console.print("[bold green]Done![/bold green]")
 
 
+def check_deps():
+    """Check and report dependency status."""
+    import os
+    import shutil
+
+    def _check(name, test_fn, hint=""):
+        try:
+            ok = test_fn()
+        except Exception:
+            ok = False
+        mark = "✓" if ok else "✗"
+        extra = f"  → {hint}" if not ok and hint else ""
+        console.print(f"  {'[green]' if ok else '[red]'}{mark}[/] {name}{extra}")
+        return ok
+
+    console.print("[bold]PDF Translator — Dependency Check[/bold]\n")
+
+    console.print("[bold]Core:[/bold]")
+    _check("Python 3.10+", lambda: sys.version_info >= (3, 10))
+    _check("Java", lambda: shutil.which("java") is not None, "brew install openjdk@21")
+    _check("PyMuPDF", lambda: __import__("fitz") and True, "pip install PyMuPDF")
+    _check("langdetect", lambda: __import__("langdetect") and True, "pip install langdetect")
+    _check("deep_translator", lambda: __import__("deep_translator") and True, "pip install deep-translator")
+
+    console.print("\n[bold]CLI Backends:[/bold]")
+    _check("Codex CLI", lambda: shutil.which("codex") is not None, "npm install -g @openai/codex")
+    _check("Claude CLI", lambda: shutil.which("claude") is not None, "npm install -g @anthropic-ai/claude-code")
+    _check("Gemini CLI", lambda: shutil.which("gemini") is not None, "npm install -g @google/gemini-cli")
+
+    console.print("\n[bold]API Keys:[/bold]")
+    for key in ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "OPENROUTER_API_KEY"]:
+        _check(key, lambda k=key: bool(os.environ.get(k)), f"export {key}=...")
+
+    console.print("\n[bold]OCR (optional):[/bold]")
+    _check("Tesseract", lambda: shutil.which("tesseract") is not None, "brew install tesseract")
+    _check("surya-ocr", lambda: __import__("surya") and True, "pip install surya-ocr")
+
+    console.print("\n[bold]Web UI (optional):[/bold]")
+    _check("FastAPI", lambda: __import__("fastapi") and True, "pip install pdf-translator[web]")
+    _check("uvicorn", lambda: __import__("uvicorn") and True, "pip install pdf-translator[web]")
+
+
+def run_compare(argv: list[str] | None = None):
+    """Compare translation quality across backends."""
+    import argparse
+    parser = argparse.ArgumentParser(prog="pdf-translator compare")
+    parser.add_argument("texts", nargs="+", help="Texts to compare")
+    parser.add_argument("--source-lang", default="en")
+    parser.add_argument("--target-lang", default="ko")
+    parser.add_argument("--backends", default=None, help="Comma-separated backend names")
+    parser.add_argument("--glossary", default=None, help="Glossary CSV or pack name")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
+    args = parser.parse_args(argv)
+
+    from pdf_translator.core.compare import compare_backends, format_comparison_table, format_comparison_json
+
+    backends = args.backends.split(",") if args.backends else None
+    glossary_dict = None
+    if args.glossary:
+        from pdf_translator.core.glossary import load_glossary
+        g = load_glossary(args.glossary)
+        if g:
+            glossary_dict = g.to_prompt_dict()
+
+    console.print(f"[bold]Comparing backends for {len(args.texts)} text(s)...[/bold]\n")
+    results = compare_backends(args.texts, args.source_lang, args.target_lang, backends, glossary_dict)
+
+    if args.json:
+        console.print(format_comparison_json(results))
+    else:
+        console.print(format_comparison_table(results))
+
+
 def run_server(argv: list[str] | None = None):
     import argparse
     parser = argparse.ArgumentParser(prog="pdf-translator serve")
@@ -301,8 +374,11 @@ def run_server(argv: list[str] | None = None):
 
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == "serve":
-        serve_args = sys.argv[2:]
-        run_server(serve_args)
+        run_server(sys.argv[2:])
+    elif len(sys.argv) > 1 and sys.argv[1] == "compare":
+        run_compare(sys.argv[2:])
+    elif len(sys.argv) > 1 and sys.argv[1] == "check-deps":
+        check_deps()
     else:
         cfg = parse_args()
         run(cfg)

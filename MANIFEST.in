@@ -1,0 +1,3 @@
+include README.md LICENSE
+recursive-include pdf_translator/data *.csv
+recursive-include pdf_translator/web/frontend/dist *

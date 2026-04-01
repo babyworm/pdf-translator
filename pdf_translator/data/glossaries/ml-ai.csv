@@ -1,0 +1,28 @@
+source,target,rule
+BERT,BERT,keep
+GPT,GPT,keep
+LSTM,LSTM,keep
+GAN,GAN,keep
+CNN,CNN,keep
+RNN,RNN,keep
+ResNet,ResNet,keep
+PyTorch,PyTorch,keep
+TensorFlow,TensorFlow,keep
+Adam,Adam,keep
+SGD,SGD,keep
+ReLU,ReLU,keep
+softmax,softmax,keep
+dropout,dropout,keep
+fine-tuning,파인튜닝,translate
+transformer,transformer,keep
+attention mechanism,어텐션 메커니즘,translate
+backpropagation,역전파,translate
+epoch,에폭,translate
+batch size,배치 크기,translate
+learning rate,학습률,translate
+overfitting,과적합,translate
+underfitting,과소적합,translate
+embedding,임베딩,translate
+tokenizer,토크나이저,translate
+inference,추론,translate
+pre-training,사전 학습,translate

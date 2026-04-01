@@ -6,10 +6,17 @@ import type { Project } from '../types'
 export function ProjectList() {
   const [projects, setProjects] = useState<Project[]>([])
   const [uploading, setUploading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
-  useEffect(() => { listProjects().then(setProjects) }, [])
+  useEffect(() => {
+    listProjects()
+      .then(setProjects)
+      .catch(() => setError('Failed to load projects'))
+      .finally(() => setLoading(false))
+  }, [])
 
   const handleUpload = async (file: File) => {
     setUploading(true)
@@ -37,7 +44,19 @@ export function ProjectList() {
           onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])} />
       </div>
 
-      {projects.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-20 text-gray-500">
+          <p className="text-lg">Loading projects...</p>
+        </div>
+      ) : error ? (
+        <div className="text-center py-20">
+          <p className="text-red-400 text-lg">{error}</p>
+          <button onClick={() => { setError(null); setLoading(true); listProjects().then(setProjects).catch(() => setError('Failed to load projects')).finally(() => setLoading(false)) }}
+            className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm">
+            Retry
+          </button>
+        </div>
+      ) : projects.length === 0 ? (
         <div className="text-center py-20 text-gray-500">
           <p className="text-lg">No projects yet</p>
           <p className="text-sm mt-2">Upload a PDF to get started</p>

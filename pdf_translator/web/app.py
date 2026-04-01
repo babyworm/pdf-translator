@@ -104,6 +104,18 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
                 "backend": project.backend, "segments_total": project.segments_total,
                 "segments_translated": project.segments_translated, "created_at": project.created_at}
 
+    # --- PDF file serving ---
+    @app.get("/api/projects/{project_id}/pdf")
+    def get_project_pdf(project_id: str):
+        project = db.get_project(project_id)
+        if project is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+        project_dir = uploads_dir / project_id
+        pdf_files = list(project_dir.glob("*.pdf"))
+        if not pdf_files:
+            raise HTTPException(status_code=404, detail="PDF not found")
+        return FileResponse(str(pdf_files[0]), media_type="application/pdf")
+
     # --- Translation trigger ---
     @app.post("/api/projects/{project_id}/translate")
     def trigger_translate(project_id: str, req: TranslateRequest):

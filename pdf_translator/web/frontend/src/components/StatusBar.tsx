@@ -4,9 +4,10 @@ import type { Project, Draft } from '../types'
 interface Props {
   project: Project
   draft: Draft | null
+  connected?: boolean
 }
 
-export function StatusBar({ project, draft }: Props) {
+export function StatusBar({ project, draft, connected }: Props) {
   const elements = draft?.elements || []
   const accepted = elements.filter((e) => e.status === 'accepted').length
   const modified = elements.filter((e) => e.status === 'modified').length
@@ -34,6 +35,11 @@ export function StatusBar({ project, draft }: Props) {
             <span className="text-yellow-400">Modified: {modified}</span>
             <span className="text-gray-400">Pending: {pending}</span>
           </>
+        )}
+        {connected !== undefined && (
+          <span className={connected ? 'text-green-400' : 'text-red-400'}>
+            {connected ? '\u25CF Connected' : '\u25CB Reconnecting...'}
+          </span>
         )}
       </div>
       <div className="flex items-center gap-2">

@@ -4,6 +4,7 @@ import { getProject, getDraft, startTranslation } from '../api'
 import { TranslatedPanel } from '../components/TranslatedPanel'
 import { GlossaryPanel } from '../components/GlossaryPanel'
 import { StatusBar } from '../components/StatusBar'
+import { PdfViewer } from '../components/PdfViewer'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { Project, Draft } from '../types'
 
@@ -12,7 +13,9 @@ export function TranslationView() {
   const [project, setProject] = useState<Project | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [showGlossary, setShowGlossary] = useState(false)
-  const { progress } = useWebSocket(id)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(0)
+  const { progress, connected } = useWebSocket(id)
 
   useEffect(() => {
     if (!id) return
@@ -35,6 +38,9 @@ export function TranslationView() {
 
   if (!project) return <div className="p-6 text-gray-500">Loading...</div>
 
+  // Filter elements for the current page on the right panel
+  const pageElements = draft ? draft.elements.filter(el => el.page === currentPage) : []
+
   return (
     <div className="flex flex-col h-[calc(100vh-49px)]">
       {/* Top bar */}
@@ -54,29 +60,38 @@ export function TranslationView() {
         </div>
       </div>
 
+      {/* Error state */}
+      {project.status === 'error' && (
+        <div className="bg-red-950/50 border border-red-800 rounded-lg p-4 mx-4 mt-4">
+          <p className="text-red-400 font-medium">Translation failed</p>
+          <p className="text-red-400/70 text-sm mt-1">Check backend availability and try again.</p>
+          <button onClick={handleStartTranslation}
+            className="mt-2 px-3 py-1 bg-red-600 hover:bg-red-500 rounded text-xs">
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Left: Original */}
+        {/* Left: Original PDF */}
         <div className="flex-1 border-r border-gray-800 flex flex-col">
           <div className="px-3 py-2 bg-gray-900/50 text-xs text-gray-500 border-b border-gray-800">
             Original ({project.source_lang || 'auto'})
           </div>
-          <div className="flex-1 overflow-y-auto p-4">
-            {draft ? draft.elements.map((el) => (
-              <div key={el.index} className="mb-3 p-2 rounded hover:bg-gray-900/50">
-                {el.type === 'heading' ? (
-                  <h3 className="font-bold text-lg">{el.original}</h3>
-                ) : (
-                  <p className="text-sm text-gray-300 leading-relaxed">{el.original}</p>
-                )}
-              </div>
-            )) : (
-              <p className="text-gray-500 text-sm">
-                {project.status === 'uploaded' ? 'Click "Start Translation" to begin' :
-                 project.status === 'translating' ? 'Translating...' : 'No content'}
-              </p>
-            )}
-          </div>
+          {project.status !== 'uploaded' ? (
+            <PdfViewer
+              projectId={id!}
+              currentPage={currentPage}
+              onPageChange={setCurrentPage}
+              totalPages={totalPages}
+              onTotalPages={setTotalPages}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+              Click "Start Translation" to begin
+            </div>
+          )}
         </div>
 
         {/* Right: Translated */}
@@ -86,7 +101,7 @@ export function TranslationView() {
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {draft ? (
-              <TranslatedPanel projectId={id!} elements={draft.elements} onUpdate={() => getDraft(id!).then(setDraft)} />
+              <TranslatedPanel projectId={id!} elements={pageElements} onUpdate={() => getDraft(id!).then(setDraft)} />
             ) : null}
           </div>
         </div>
@@ -99,7 +114,7 @@ export function TranslationView() {
         </div>
       )}
 
-      <StatusBar project={project} draft={draft} />
+      <StatusBar project={project} draft={draft} connected={connected} />
     </div>
   )
 }

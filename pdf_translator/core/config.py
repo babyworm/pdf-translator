@@ -17,3 +17,4 @@ class TranslatorConfig:
     effort: str = "low"
     pages: str | None = None
     use_cache: bool = True
+    backend: str = "auto"

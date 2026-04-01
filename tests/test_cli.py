@@ -2,7 +2,7 @@
 import os
 import sys
 import pytest
-from pdf_translator.cli import parse_args
+from pdf_translator.cli.main import parse_args
 
 
 def test_parse_args_minimal():
@@ -15,6 +15,7 @@ def test_parse_args_minimal():
     assert cfg.effort == "low"
     assert cfg.pages is None
     assert cfg.use_cache is True
+    assert cfg.backend == "auto"
 
 
 def test_parse_args_all_options():
@@ -27,6 +28,7 @@ def test_parse_args_all_options():
         "--effort", "medium",
         "--pages", "1-5,10",
         "--no-cache",
+        "--backend", "codex",
     ])
     assert cfg.input_path == "doc.pdf"
     assert cfg.output_dir == "/tmp/out"
@@ -36,6 +38,7 @@ def test_parse_args_all_options():
     assert cfg.effort == "medium"
     assert cfg.pages == "1-5,10"
     assert cfg.use_cache is False
+    assert cfg.backend == "codex"
 
 
 def test_parse_args_missing_input():

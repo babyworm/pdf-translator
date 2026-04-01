@@ -4,7 +4,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.pdf_builder import build_pdf, _builtin_cjk_fontname, _cjk_font_kwargs
+from pdf_translator.core.pdf_builder import build_pdf, _builtin_cjk_fontname
 
 
 def _create_test_pdf(path: str, text: str = "Hello World") -> None:
@@ -67,19 +67,23 @@ def test_builtin_cjk_fontname_chinese():
     assert _builtin_cjk_fontname("你好世界") == "china-ss"
 
 
-def test_cjk_font_kwargs_with_file():
-    result = _cjk_font_kwargs("안녕", "/fake/font.ttf")
-    assert result == {"fontfile": "/fake/font.ttf", "fontname": "CJK"}
+def test_build_pdf_with_is_scanned_flag():
+    """Verify build_pdf accepts is_scanned parameter."""
+    with tempfile.TemporaryDirectory() as d:
+        src = str(Path(d) / "input.pdf")
+        dst = str(Path(d) / "output.pdf")
+        _create_test_pdf(src)
 
-
-def test_cjk_font_kwargs_builtin_fallback():
-    result = _cjk_font_kwargs("안녕", None)
-    assert result == {"fontname": "korea"}
-
-
-def test_cjk_font_kwargs_latin_text():
-    result = _cjk_font_kwargs("Hello World", None)
-    assert result == {}
+        elements = [
+            Element(
+                type="paragraph", content="Hello World", page_number=1,
+                bbox=[72, 88, 200, 104], font_size=12.0,
+            )
+        ]
+        translations = {0: "안녕 세계"}
+        build_pdf(src, dst, elements, translations, is_scanned=True)
+        assert Path(dst).exists()
+        assert Path(dst).stat().st_size > 0
 
 
 def test_build_pdf_japanese_text():

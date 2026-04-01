@@ -1,0 +1,17 @@
+.git
+.github
+.venv
+.omc
+.omx
+.claude
+.superpowers
+.rtl-agent-team
+.pytest_cache
+__pycache__
+*.pyc
+*.egg-info
+node_modules
+pdf_translator/web/frontend/node_modules
+docs/
+output/
+*.pdf

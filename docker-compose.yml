@@ -1,0 +1,17 @@
+services:
+  pdf-translator:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - pdf-data:/data
+      - ./output:/app/output
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    restart: unless-stopped
+
+volumes:
+  pdf-data:

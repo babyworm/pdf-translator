@@ -53,15 +53,15 @@ def test_end_to_end_with_mock_codex():
         fake_router = MagicMock()
         fake_router.select.return_value = FakeBackend()
 
-        class _InProcessPool:
-            def __init__(self, processes=1): pass
+        class _InProcessExecutor:
+            def __init__(self, max_workers=1): pass
             def __enter__(self): return self
             def __exit__(self, *args): pass
             def map(self, fn, iterable): return [fn(item) for item in iterable]
 
         with patch("pdf_translator.cli.main.extract_pdf", return_value=mock_elements), \
              patch("pdf_translator.cli.main.BackendRouter", return_value=fake_router), \
-             patch("pdf_translator.core.translator.Pool", _InProcessPool), \
+             patch("pdf_translator.core.translator.ThreadPoolExecutor", _InProcessExecutor), \
              patch("pdf_translator.core.translator.BackendRouter", return_value=fake_router):
             run(cfg)
 

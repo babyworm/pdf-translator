@@ -52,20 +52,25 @@ def _sample_background_color(pixmap: fitz.Pixmap) -> tuple[float, float, float]:
     pixel_count = pixmap.width * pixmap.height
     if pixel_count == 0:
         return (1.0, 1.0, 1.0)
-    if n < 3:
-        # Grayscale
-        gray = sum(samples[i] for i in range(0, len(samples), n)) / (pixel_count * 255)
-        return (gray, gray, gray)
+    # Sample every Nth pixel for performance (max 1000 samples)
+    step = max(1, pixel_count // 1000)
     r_sum = g_sum = b_sum = 0
-    for i in range(0, len(samples), n):
-        r_sum += samples[i]
-        g_sum += samples[i + 1]
-        b_sum += samples[i + 2]
-    return (
-        r_sum / (pixel_count * 255),
-        g_sum / (pixel_count * 255),
-        b_sum / (pixel_count * 255),
-    )
+    sampled = 0
+    if n < 3:
+        for i in range(0, len(samples), n * step):
+            r_sum += samples[i]
+            sampled += 1
+        gray = r_sum / (sampled * 255) if sampled else 1.0
+        return (gray, gray, gray)
+    for i in range(0, len(samples), n * step):
+        if i + 2 < len(samples):
+            r_sum += samples[i]
+            g_sum += samples[i + 1]
+            b_sum += samples[i + 2]
+            sampled += 1
+    if sampled == 0:
+        return (1.0, 1.0, 1.0)
+    return (r_sum / (sampled * 255), g_sum / (sampled * 255), b_sum / (sampled * 255))
 
 
 def _fit_fontsize_v2(text: str, rect: fitz.Rect, max_size: float) -> float:

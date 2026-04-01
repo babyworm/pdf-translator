@@ -33,5 +33,5 @@ class AnthropicBackend:
             resp.raise_for_status()
             return resp.json()["content"][0]["text"]
         except Exception as e:
-            logger.warning("Anthropic API failed: %s", e)
+            logger.warning("Anthropic API failed: %s", type(e).__name__)
             return ""

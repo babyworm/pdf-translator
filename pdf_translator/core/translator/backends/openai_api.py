@@ -33,5 +33,5 @@ class OpenAIBackend:
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
         except Exception as e:
-            logger.warning("OpenAI API failed: %s", e)
+            logger.warning("OpenAI API failed: %s", type(e).__name__)
             return ""

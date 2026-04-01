@@ -24,9 +24,9 @@ class GoogleAPIBackend:
         return [None] * len(texts)
     def _call_api(self, prompt: str) -> str:
         api_key = os.environ.get("GOOGLE_API_KEY", "")
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
         try:
-            resp = requests.post(url, headers={"Content-Type": "application/json"},
+            resp = requests.post(url, params={"key": api_key}, headers={"Content-Type": "application/json"},
                 json={"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.1}},
                 timeout=120)
             resp.raise_for_status()

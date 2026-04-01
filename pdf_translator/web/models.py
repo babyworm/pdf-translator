@@ -58,7 +58,7 @@ class Database:
 
     def create_project(self, filename: str, **kwargs) -> Project:
         project = Project(
-            id=str(uuid.uuid4())[:8],
+            id=str(uuid.uuid4()),
             filename=filename,
             created_at=datetime.now(timezone.utc).isoformat(),
             **kwargs,
@@ -72,13 +72,15 @@ class Database:
         return project
 
     def get_project(self, project_id: str) -> Project | None:
-        row = self._conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
         if row is None:
             return None
         return Project(**dict(row))
 
     def list_projects(self) -> list[Project]:
-        rows = self._conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM projects ORDER BY created_at DESC").fetchall()
         return [Project(**dict(r)) for r in rows]
 
     def update_project(self, project_id: str, **kwargs) -> None:
@@ -93,7 +95,7 @@ class Database:
 
     # Glossary CRUD
     def create_glossary(self, name: str, entries: dict) -> dict:
-        gid = str(uuid.uuid4())[:8]
+        gid = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
         with self._lock:
             self._conn.execute(
@@ -104,11 +106,13 @@ class Database:
         return {"id": gid, "name": name, "entries": entries, "created_at": now}
 
     def list_glossaries(self) -> list[dict]:
-        rows = self._conn.execute("SELECT * FROM glossaries ORDER BY created_at DESC").fetchall()
+        with self._lock:
+            rows = self._conn.execute("SELECT * FROM glossaries ORDER BY created_at DESC").fetchall()
         return [{"id": r["id"], "name": r["name"], "entries": json.loads(r["entries_json"]), "created_at": r["created_at"]} for r in rows]
 
     def get_glossary(self, glossary_id: str) -> dict | None:
-        row = self._conn.execute("SELECT * FROM glossaries WHERE id=?", (glossary_id,)).fetchone()
+        with self._lock:
+            row = self._conn.execute("SELECT * FROM glossaries WHERE id=?", (glossary_id,)).fetchone()
         if row is None:
             return None
         return {"id": row["id"], "name": row["name"], "entries": json.loads(row["entries_json"]), "created_at": row["created_at"]}

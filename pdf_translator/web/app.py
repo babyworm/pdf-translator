@@ -7,12 +7,24 @@ import shutil
 import threading
 from pathlib import Path
 
+from typing import Literal
+
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from pdf_translator.web.models import Database
+
+_draft_locks: dict[str, threading.Lock] = {}
+_draft_locks_lock = threading.Lock()
+
+
+def _get_draft_lock(project_id: str) -> threading.Lock:
+    with _draft_locks_lock:
+        if project_id not in _draft_locks:
+            _draft_locks[project_id] = threading.Lock()
+        return _draft_locks[project_id]
 
 
 class TranslateRequest(BaseModel):
@@ -24,7 +36,7 @@ class TranslateRequest(BaseModel):
 
 class SegmentUpdate(BaseModel):
     user_edit: str | None = None
-    status: str | None = None
+    status: Literal["accepted", "modified", "rejected", "pending"] | None = None
 
 
 class GlossaryCreate(BaseModel):
@@ -88,12 +100,15 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
     @app.post("/api/projects", status_code=201)
     async def create_project(file: UploadFile = File(...)):
         safe_name = Path(file.filename or "upload.pdf").name
+        content = await file.read()
+        if len(content) > 100 * 1024 * 1024:
+            raise HTTPException(400, "PDF file too large (max 100MB)")
         project = db.create_project(filename=safe_name)
         project_dir = uploads_dir / project.id
         project_dir.mkdir(exist_ok=True)
         pdf_path = project_dir / safe_name
         with open(pdf_path, "wb") as f:
-            shutil.copyfileobj(file.file, f)
+            f.write(content)
         return {"id": project.id, "filename": project.filename, "status": project.status}
 
     @app.get("/api/projects")
@@ -201,16 +216,17 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
         draft_path = uploads_dir / project_id / "output" / "draft.json"
         if not draft_path.exists():
             raise HTTPException(status_code=404, detail="Draft not found")
-        from pdf_translator.core.draft import Draft
-        draft = Draft.load(str(draft_path))
-        for el in draft.elements:
-            if el.index == element_idx:
-                if update.user_edit is not None:
-                    el.user_edit = update.user_edit
-                if update.status is not None:
-                    el.status = update.status
-                draft.save(str(draft_path))
-                return {"index": el.index, "status": el.status, "user_edit": el.user_edit}
+        with _get_draft_lock(project_id):
+            from pdf_translator.core.draft import Draft
+            draft = Draft.load(str(draft_path))
+            for el in draft.elements:
+                if el.index == element_idx:
+                    if update.user_edit is not None:
+                        el.user_edit = update.user_edit
+                    if update.status is not None:
+                        el.status = update.status
+                    draft.save(str(draft_path))
+                    return {"index": el.index, "status": el.status, "user_edit": el.user_edit}
         raise HTTPException(status_code=404, detail=f"Element {element_idx} not found")
 
     # --- Export ---
@@ -264,7 +280,10 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
 
     @app.post("/api/glossaries/import", status_code=201)
     async def import_glossary(file: UploadFile = File(...)):
-        content = (await file.read()).decode("utf-8")
+        raw = await file.read()
+        if len(raw) > 5 * 1024 * 1024:
+            raise HTTPException(400, "Glossary file too large (max 5MB)")
+        content = raw.decode("utf-8")
         reader = csv.DictReader(io.StringIO(content))
         entries = {}
         for row in reader:

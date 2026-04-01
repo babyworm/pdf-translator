@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from multiprocessing import Pool
+from concurrent.futures import ThreadPoolExecutor
 
 from pdf_translator.core.extractor import Element
 from pdf_translator.core.translator.base import LANG_NAMES as LANG_NAMES
@@ -81,8 +81,8 @@ def translate_all(
         return results
 
     workers = max(1, workers)
-    with Pool(processes=min(workers, len(work_items))) as pool:
-        for batch_results in pool.map(_worker_translate, work_items):
+    with ThreadPoolExecutor(max_workers=min(workers, len(work_items))) as executor:
+        for batch_results in executor.map(_worker_translate, work_items):
             for gidx, translated, original in batch_results:
                 if translated is not None:
                     results[gidx] = translated

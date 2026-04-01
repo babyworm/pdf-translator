@@ -18,3 +18,8 @@ class TranslatorConfig:
     pages: str | None = None
     use_cache: bool = True
     backend: str = "auto"
+    glossary: str | None = None
+    draft_only: bool = False
+    build_from: str | None = None
+    retranslate: str | None = None
+    ocr_engine: str = "auto"

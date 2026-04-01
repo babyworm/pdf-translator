@@ -11,6 +11,7 @@ from pdf_translator.core.translator import translate_all, detect_language
 from pdf_translator.core.translator.router import BackendRouter
 from pdf_translator.core.pdf_builder import build_pdf
 from pdf_translator.core.md_builder import build_markdown
+from pdf_translator.core.glossary import load_glossary
 
 
 def translate_pdf(
@@ -39,6 +40,16 @@ def translate_pdf(
     if source_lang == "auto" and elements:
         source_lang = detect_language(elements)
 
+    # Resolve glossary to a dict for the translation pipeline
+    glossary_dict = None
+    if glossary is not None:
+        if isinstance(glossary, dict):
+            glossary_dict = glossary
+        else:
+            g = load_glossary(glossary)
+            if g:
+                glossary_dict = g.to_prompt_dict()
+
     valid_indices = [i for i, el in enumerate(elements) if el.content.strip()]
     batches = build_batches(elements)
 
@@ -47,6 +58,7 @@ def translate_pdf(
         raw = translate_all(
             batches, source_lang=source_lang, target_lang=target_lang,
             effort=effort, workers=workers, cache=cache, backend=backend,
+            glossary=glossary_dict,
         )
         translations = {
             valid_indices[gi]: text

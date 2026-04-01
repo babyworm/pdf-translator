@@ -23,9 +23,9 @@ def detect_language(elements: list[Element]) -> str:
 
 
 def _worker_translate(
-    work_item: tuple[list[dict], str, str, str, str],
+    work_item: tuple[list[dict], str, str, str, str, dict[str, str] | None],
 ) -> list[tuple[int, str, str]]:
-    items, source_lang, target_lang, effort, backend_name = work_item
+    items, source_lang, target_lang, effort, backend_name, glossary = work_item
     uncached = [d for d in items if not d["cached"]]
     if not uncached:
         return []
@@ -34,7 +34,7 @@ def _worker_translate(
     backend = router.select(backend_name)
 
     texts = [d["content"] for d in uncached]
-    translations = backend.translate(texts, source_lang, target_lang)
+    translations = backend.translate(texts, source_lang, target_lang, glossary=glossary)
     return [
         (item["global_idx"], translated, item["content"])
         for item, translated in zip(uncached, translations)
@@ -49,6 +49,7 @@ def translate_all(
     workers: int = 4,
     cache=None,
     backend: str = "auto",
+    glossary: dict[str, str] | None = None,
 ) -> dict[int, str]:
     results: dict[int, str] = {}
     work_items = []
@@ -71,7 +72,7 @@ def translate_all(
             })
             global_idx += 1
         if not all_cached:
-            work_items.append((batch_items, source_lang, target_lang, effort, backend))
+            work_items.append((batch_items, source_lang, target_lang, effort, backend, glossary))
 
     if not work_items:
         return results

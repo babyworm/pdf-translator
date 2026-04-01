@@ -15,7 +15,7 @@ def _el(content: str, page: int = 1) -> Element:
 
 def _mock_worker(work_item):
     """In-process worker that returns mock translations."""
-    items, src, tgt, effort, backend_name = work_item
+    items, src, tgt, effort, backend_name, glossary = work_item
     return [
         (item["global_idx"], f"[{tgt}]{item['content']}", item["content"])
         for item in items

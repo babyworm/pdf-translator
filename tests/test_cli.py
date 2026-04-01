@@ -41,6 +41,37 @@ def test_parse_args_all_options():
     assert cfg.backend == "codex"
 
 
-def test_parse_args_missing_input():
-    with pytest.raises(SystemExit):
-        parse_args([])
+def test_parse_args_glossary():
+    cfg = parse_args(["test.pdf", "--glossary", "ml-ai"])
+    assert cfg.glossary == "ml-ai"
+
+
+def test_parse_args_draft_only():
+    cfg = parse_args(["test.pdf", "--draft-only"])
+    assert cfg.draft_only is True
+
+
+def test_parse_args_build_from():
+    cfg = parse_args(["--build-from", "draft.json"])
+    assert cfg.build_from == "draft.json"
+    assert cfg.input_path == ""
+
+
+def test_parse_args_retranslate():
+    cfg = parse_args(["--retranslate", "draft.json"])
+    assert cfg.retranslate == "draft.json"
+    assert cfg.input_path == ""
+
+
+def test_parse_args_ocr_engine():
+    cfg = parse_args(["test.pdf", "--ocr-engine", "tesseract"])
+    assert cfg.ocr_engine == "tesseract"
+
+
+def test_parse_args_defaults_new_fields():
+    cfg = parse_args(["test.pdf"])
+    assert cfg.glossary is None
+    assert cfg.draft_only is False
+    assert cfg.build_from is None
+    assert cfg.retranslate is None
+    assert cfg.ocr_engine == "auto"

@@ -32,5 +32,5 @@ class GoogleAPIBackend:
             resp.raise_for_status()
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
-            logger.warning("Google API failed: %s", e)
+            logger.warning("Google API failed: %s", type(e).__name__)
             return ""

@@ -145,15 +145,20 @@ def _ocr_fallback(pdf_path: str, ocr_engine, pages: str | None = None) -> list[E
 
 def _parse_pages(pages_str: str, total: int) -> list[int]:
     """Parse page spec like '1,3,5-7' into 0-indexed list."""
+    import logging
+    logger = logging.getLogger(__name__)
     result: list[int] = []
     for part in pages_str.split(","):
         part = part.strip()
-        if "-" in part:
-            start, end = part.split("-", 1)
-            for i in range(int(start) - 1, min(int(end), total)):
-                result.append(i)
-        else:
-            idx = int(part) - 1
-            if 0 <= idx < total:
-                result.append(idx)
+        try:
+            if "-" in part:
+                start, end = part.split("-", 1)
+                for i in range(int(start) - 1, min(int(end), total)):
+                    result.append(i)
+            else:
+                idx = int(part) - 1
+                if 0 <= idx < total:
+                    result.append(idx)
+        except ValueError:
+            logger.warning("Skipping invalid page spec: %s", part)
     return result

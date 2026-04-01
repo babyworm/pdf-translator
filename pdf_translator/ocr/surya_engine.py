@@ -10,6 +10,18 @@ logger = logging.getLogger(__name__)
 class SuryaOCREngine:
     name = "surya"
 
+    def __init__(self):
+        self._det_model = None
+        self._rec_model = None
+
+    def _get_models(self):
+        if self._det_model is None:
+            from surya.model.detection.model import load_model as load_det_model
+            from surya.model.recognition.model import load_model as load_rec_model
+            self._det_model = load_det_model()
+            self._rec_model = load_rec_model()
+        return self._det_model, self._rec_model
+
     def is_available(self) -> bool:
         try:
             import surya  # noqa: F401
@@ -23,13 +35,10 @@ class SuryaOCREngine:
             import io
 
             from PIL import Image
-            from surya.model.detection.model import load_model as load_det_model
-            from surya.model.recognition.model import load_model as load_rec_model
             from surya.ocr import run_ocr
 
             image = Image.open(io.BytesIO(page_image))
-            det_model = load_det_model()
-            rec_model = load_rec_model()
+            det_model, rec_model = self._get_models()
             ocr_results = run_ocr(
                 [image], [det_model, rec_model], langs=[[lang]]
             )

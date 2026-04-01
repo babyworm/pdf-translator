@@ -84,4 +84,6 @@ def translate_pdf(
         "md_path": str(md_out),
         "segments_total": len(elements),
         "segments_translated": len(translations),
+        "translations": translations,
+        "elements": elements,
     }

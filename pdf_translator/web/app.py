@@ -51,11 +51,14 @@ class ConnectionManager:
             self._connections[project_id] = [w for w in self._connections[project_id] if w is not ws]
 
     async def send_progress(self, project_id: str, data: dict):
+        dead = []
         for ws in self._connections.get(project_id, []):
             try:
                 await ws.send_text(json.dumps(data))
             except Exception:
-                pass
+                dead.append(ws)
+        for ws in dead:
+            self.disconnect(project_id, ws)
 
 
 def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
@@ -72,6 +75,10 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
     app.state.uploads_dir = uploads_dir
     app.state.ws_manager = ws_manager
 
+    @app.on_event("shutdown")
+    def shutdown():
+        db.close()
+
     # --- Health ---
     @app.get("/api/health")
     def health():
@@ -80,10 +87,11 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
     # --- Projects ---
     @app.post("/api/projects", status_code=201)
     async def create_project(file: UploadFile = File(...)):
-        project = db.create_project(filename=file.filename or "unknown.pdf")
+        safe_name = Path(file.filename or "upload.pdf").name
+        project = db.create_project(filename=safe_name)
         project_dir = uploads_dir / project.id
         project_dir.mkdir(exist_ok=True)
-        pdf_path = project_dir / (file.filename or "upload.pdf")
+        pdf_path = project_dir / safe_name
         with open(pdf_path, "wb") as f:
             shutil.copyfileobj(file.file, f)
         return {"id": project.id, "filename": project.filename, "status": project.status}
@@ -151,14 +159,14 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
                 )
                 # Save draft
                 from pdf_translator.core.draft import Draft, DraftElement
-                from pdf_translator.core.extractor import extract_pdf
-                elements = extract_pdf(pdf_path, output_dir=output_dir)
+                elements = result.get("elements", [])
+                translations = result.get("translations", {})
                 draft_elements = []
                 for i, el in enumerate(elements):
                     if el.content.strip():
                         draft_elements.append(DraftElement(
                             index=i, type=el.type, original=el.content,
-                            translated=result.get("translations", {}).get(i, el.content),
+                            translated=translations.get(i, el.content),
                             page=el.page_number, bbox=el.bbox,
                         ))
                 draft = Draft(source_file=project.filename, source_lang=req.source_lang,
@@ -169,6 +177,8 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
                                   segments_total=result["segments_total"],
                                   segments_translated=result["segments_translated"])
             except Exception:
+                import logging
+                logging.getLogger(__name__).exception("Translation failed for project %s", project_id)
                 db.update_project(project_id, status="error")
 
         thread = threading.Thread(target=run_translation, daemon=True)
@@ -184,8 +194,6 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
         draft_path = uploads_dir / project_id / "output" / "draft.json"
         if not draft_path.exists():
             raise HTTPException(status_code=404, detail="Draft not found")
-        from pdf_translator.core.draft import Draft
-        Draft.load(str(draft_path))
         return json.loads(draft_path.read_text(encoding="utf-8"))
 
     @app.patch("/api/projects/{project_id}/draft/{element_idx}")
@@ -264,7 +272,8 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
             target = row.get("target", "").strip()
             if source:
                 entries[source] = target or source
-        name = Path(file.filename or "imported").stem
+        safe_name = Path(file.filename or "imported").name
+        name = Path(safe_name).stem
         return db.create_glossary(name=name, entries=entries)
 
     # --- WebSocket ---

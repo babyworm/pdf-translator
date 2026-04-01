@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+_PROJECT_COLUMNS = {"status", "target_lang", "source_lang", "backend", "segments_total", "segments_translated", "glossary"}
+_GLOSSARY_COLUMNS = {"name", "entries_json"}
 
 
 @dataclass
@@ -24,6 +28,7 @@ class Project:
 
 class Database:
     def __init__(self, db_path: str | Path):
+        self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._init_tables()
@@ -58,11 +63,12 @@ class Database:
             created_at=datetime.now(timezone.utc).isoformat(),
             **kwargs,
         )
-        self._conn.execute(
-            "INSERT INTO projects (id, filename, source_lang, target_lang, backend, status, created_at, glossary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (project.id, project.filename, project.source_lang, project.target_lang, project.backend, project.status, project.created_at, project.glossary),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO projects (id, filename, source_lang, target_lang, backend, status, created_at, glossary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (project.id, project.filename, project.source_lang, project.target_lang, project.backend, project.status, project.created_at, project.glossary),
+            )
+            self._conn.commit()
         return project
 
     def get_project(self, project_id: str) -> Project | None:
@@ -76,20 +82,25 @@ class Database:
         return [Project(**dict(r)) for r in rows]
 
     def update_project(self, project_id: str, **kwargs) -> None:
+        invalid = set(kwargs) - _PROJECT_COLUMNS
+        if invalid:
+            raise ValueError(f"Invalid columns: {invalid}")
         sets = ", ".join(f"{k}=?" for k in kwargs)
         vals = list(kwargs.values()) + [project_id]
-        self._conn.execute(f"UPDATE projects SET {sets} WHERE id=?", vals)
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(f"UPDATE projects SET {sets} WHERE id=?", vals)
+            self._conn.commit()
 
     # Glossary CRUD
     def create_glossary(self, name: str, entries: dict) -> dict:
         gid = str(uuid.uuid4())[:8]
         now = datetime.now(timezone.utc).isoformat()
-        self._conn.execute(
-            "INSERT INTO glossaries (id, name, entries_json, created_at) VALUES (?, ?, ?, ?)",
-            (gid, name, json.dumps(entries, ensure_ascii=False), now),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO glossaries (id, name, entries_json, created_at) VALUES (?, ?, ?, ?)",
+                (gid, name, json.dumps(entries, ensure_ascii=False), now),
+            )
+            self._conn.commit()
         return {"id": gid, "name": name, "entries": entries, "created_at": now}
 
     def list_glossaries(self) -> list[dict]:
@@ -109,10 +120,14 @@ class Database:
         if entries is not None:
             updates["entries_json"] = json.dumps(entries, ensure_ascii=False)
         if updates:
+            invalid = set(updates) - _GLOSSARY_COLUMNS
+            if invalid:
+                raise ValueError(f"Invalid columns: {invalid}")
             sets = ", ".join(f"{k}=?" for k in updates)
             vals = list(updates.values()) + [glossary_id]
-            self._conn.execute(f"UPDATE glossaries SET {sets} WHERE id=?", vals)
-            self._conn.commit()
+            with self._lock:
+                self._conn.execute(f"UPDATE glossaries SET {sets} WHERE id=?", vals)
+                self._conn.commit()
 
     def close(self):
         self._conn.close()

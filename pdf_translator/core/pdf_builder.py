@@ -52,6 +52,10 @@ def _sample_background_color(pixmap: fitz.Pixmap) -> tuple[float, float, float]:
     pixel_count = pixmap.width * pixmap.height
     if pixel_count == 0:
         return (1.0, 1.0, 1.0)
+    if n < 3:
+        # Grayscale
+        gray = sum(samples[i] for i in range(0, len(samples), n)) / (pixel_count * 255)
+        return (gray, gray, gray)
     r_sum = g_sum = b_sum = 0
     for i in range(0, len(samples), n):
         r_sum += samples[i]

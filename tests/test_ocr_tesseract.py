@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
-from pdf_translator.ocr.tesseract_engine import TesseractOCREngine
 from pdf_translator.ocr.base import OCRResult
+from pdf_translator.ocr.tesseract_engine import TesseractOCREngine
 
 
 def test_is_available_with_binary():

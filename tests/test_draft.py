@@ -1,7 +1,5 @@
-import json
-import tempfile
-from pathlib import Path
 from pdf_translator.core.draft import Draft, DraftElement
+
 
 def test_create_draft():
     elements = [

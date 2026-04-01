@@ -4,7 +4,7 @@ from pathlib import Path
 import fitz  # PyMuPDF
 
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.pdf_builder import build_pdf, _builtin_cjk_fontname
+from pdf_translator.core.pdf_builder import _builtin_cjk_fontname, build_pdf
 
 
 def _create_test_pdf(path: str, text: str = "Hello World") -> None:

@@ -1,6 +1,9 @@
-import json, os
+import json
+import os
 from unittest.mock import patch
+
 from pdf_translator.core.translator.backends.openai_api import OpenAIBackend
+
 
 def test_available_with_key():
     with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"}):

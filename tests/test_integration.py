@@ -1,13 +1,12 @@
 """End-to-end smoke test: extract -> chunk -> (mock) translate -> pdf + md output."""
-import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import fitz
 
-from pdf_translator.core.config import TranslatorConfig
 from pdf_translator.cli.main import run
+from pdf_translator.core.config import TranslatorConfig
 
 
 def _create_test_pdf(path: str) -> None:

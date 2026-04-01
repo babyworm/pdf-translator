@@ -1,5 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from pdf_translator.core.translator.backends.google_translate import GoogleTranslateBackend
+
 
 def test_is_available_with_package():
     with patch.dict("sys.modules", {"deep_translator": MagicMock()}):

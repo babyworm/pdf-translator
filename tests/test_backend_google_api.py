@@ -1,6 +1,9 @@
-import json, os
+import json
+import os
 from unittest.mock import patch
+
 from pdf_translator.core.translator.backends.google_api import GoogleAPIBackend
+
 
 def test_available_with_key():
     with patch.dict(os.environ, {"GOOGLE_API_KEY": "test"}):

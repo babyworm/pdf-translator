@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock
+
 from pdf_translator.core.translator.router import BackendRouter
 
 
@@ -15,8 +16,11 @@ def test_auto_select_first_available_cli():
 
 def test_auto_select_falls_to_api():
     router = BackendRouter()
-    cli = MagicMock(); cli.is_available.return_value = False
-    api = MagicMock(); api.is_available.return_value = True; api.name = "openai"
+    cli = MagicMock()
+    cli.is_available.return_value = False
+    api = MagicMock()
+    api.is_available.return_value = True
+    api.name = "openai"
     router._cli_backends = [cli]
     router._api_backends = [api]
     router._fallback = None
@@ -25,14 +29,18 @@ def test_auto_select_falls_to_api():
 
 def test_explicit_select():
     router = BackendRouter()
-    mock = MagicMock(); mock.name = "claude-cli"; mock.is_available.return_value = True
+    mock = MagicMock()
+    mock.name = "claude-cli"
+    mock.is_available.return_value = True
     router._all_backends = {"claude-cli": mock}
     assert router.select("claude-cli") is mock
 
 
 def test_explicit_unavailable_raises():
     router = BackendRouter()
-    mock = MagicMock(); mock.name = "claude-cli"; mock.is_available.return_value = False
+    mock = MagicMock()
+    mock.name = "claude-cli"
+    mock.is_available.return_value = False
     router._all_backends = {"claude-cli": mock}
     try:
         router.select("claude-cli")
@@ -43,8 +51,11 @@ def test_explicit_unavailable_raises():
 
 def test_auto_fallback_google():
     router = BackendRouter()
-    cli = MagicMock(); cli.is_available.return_value = False
-    fb = MagicMock(); fb.is_available.return_value = True; fb.name = "google-translate"
+    cli = MagicMock()
+    cli.is_available.return_value = False
+    fb = MagicMock()
+    fb.is_available.return_value = True
+    fb.name = "google-translate"
     router._cli_backends = [cli]
     router._api_backends = []
     router._fallback = fb

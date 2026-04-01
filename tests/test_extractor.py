@@ -1,9 +1,5 @@
-import json
-import tempfile
-from pathlib import Path
-from unittest.mock import patch, MagicMock
 
-from pdf_translator.core.extractor import Element, parse_elements, extract_pdf
+from pdf_translator.core.extractor import Element, parse_elements
 
 
 def test_element_creation():

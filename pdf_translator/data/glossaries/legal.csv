@@ -1,0 +1,36 @@
+source,target,rule
+GDPR,GDPR,keep
+CCPA,CCPA,keep
+HIPAA,HIPAA,keep
+SEC,SEC,keep
+IP,IP,keep
+NDA,NDA,keep
+SLA,SLA,keep
+EULA,EULA,keep
+TOS,TOS,keep
+jurisdiction,관할권,translate
+liability,책임,translate
+indemnification,면책,translate
+arbitration,중재,translate
+compliance,준수,translate
+negligence,과실,translate
+breach,위반,translate
+tort,불법행위,translate
+plaintiff,원고,translate
+defendant,피고,translate
+statute,법령,translate
+regulation,규정,translate
+amendment,개정,translate
+injunction,금지명령,translate
+fiduciary,수탁자,translate
+due diligence,실사,translate
+force majeure,불가항력,translate
+intellectual property,지적재산권,translate
+trade secret,영업비밀,translate
+non-disclosure,비공개,translate
+severability,가분성,translate
+governing law,준거법,translate
+warranty,보증,translate
+disclaimer,면책조항,translate
+confidentiality,기밀유지,translate
+termination,해지,translate

@@ -1,7 +1,6 @@
 """Tests for CLI argument parsing and pipeline orchestration."""
 import os
-import sys
-import pytest
+
 from pdf_translator.cli.main import parse_args
 
 

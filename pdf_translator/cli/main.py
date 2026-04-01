@@ -6,19 +6,19 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+from rich.progress import BarColumn, Progress, SpinnerColumn, TextColumn
 
-from pdf_translator.core.config import TranslatorConfig
-from pdf_translator.core.extractor import extract_pdf
-from pdf_translator.core.chunker import build_batches
 from pdf_translator.core.cache import TranslationCache
-from pdf_translator.core.translator import translate_all, detect_language
+from pdf_translator.core.chunker import build_batches
+from pdf_translator.core.config import TranslatorConfig
+from pdf_translator.core.draft import Draft, DraftElement
+from pdf_translator.core.extractor import extract_pdf
+from pdf_translator.core.glossary import load_glossary
+from pdf_translator.core.md_builder import build_markdown
+from pdf_translator.core.pdf_builder import build_pdf
+from pdf_translator.core.translator import detect_language, translate_all
 from pdf_translator.core.translator.base import LANG_NAMES
 from pdf_translator.core.translator.router import BackendRouter
-from pdf_translator.core.pdf_builder import build_pdf
-from pdf_translator.core.md_builder import build_markdown
-from pdf_translator.core.glossary import load_glossary, Glossary
-from pdf_translator.core.draft import Draft, DraftElement
 
 console = Console()
 
@@ -287,9 +287,10 @@ def run_server(argv: list[str] | None = None):
 
     try:
         import uvicorn
+
         from pdf_translator.web.app import create_app
         app = create_app(data_dir=args.data_dir)
-        console.print(f"[bold green]Starting PDF Translator Web UI[/bold green]")
+        console.print("[bold green]Starting PDF Translator Web UI[/bold green]")
         console.print(f"  URL: [cyan]http://{args.host}:{args.port}[/cyan]")
         uvicorn.run(app, host=args.host, port=args.port)
     except ImportError:

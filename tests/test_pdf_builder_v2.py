@@ -1,8 +1,10 @@
 import tempfile
 from pathlib import Path
+
 import fitz
+
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.pdf_builder import build_pdf, _sample_background_color, _fit_fontsize_v2
+from pdf_translator.core.pdf_builder import _fit_fontsize_v2, _sample_background_color, build_pdf
 
 
 def _create_test_pdf(path: str) -> None:

@@ -4,7 +4,7 @@ from pathlib import Path
 import fitz
 
 from pdf_translator.ocr.base import OCREngine, OCRResult
-from pdf_translator.ocr.detector import is_scanned_page, detect_pdf_type
+from pdf_translator.ocr.detector import detect_pdf_type, is_scanned_page
 
 
 class FakeOCR:

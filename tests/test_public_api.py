@@ -1,6 +1,7 @@
 """Tests for the public Python API (pdf_translator.core.translate_pdf)."""
+from unittest.mock import patch
+
 import fitz
-from unittest.mock import patch, MagicMock
 
 
 def test_core_imports():

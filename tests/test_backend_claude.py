@@ -1,6 +1,8 @@
 import json
 from unittest.mock import patch
+
 from pdf_translator.core.translator.backends.claude_cli import ClaudeCLIBackend
+
 
 def test_is_available_true():
     with patch("shutil.which", return_value="/usr/bin/claude"):

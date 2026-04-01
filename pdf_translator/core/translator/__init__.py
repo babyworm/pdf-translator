@@ -4,14 +4,17 @@ import logging
 from multiprocessing import Pool
 
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.translator.base import TranslationBackend, build_prompt, parse_response, LANG_NAMES
-from pdf_translator.core.translator.router import BackendRouter
+from pdf_translator.core.translator.base import LANG_NAMES as LANG_NAMES
+from pdf_translator.core.translator.base import TranslationBackend as TranslationBackend
+from pdf_translator.core.translator.base import build_prompt as build_prompt
+from pdf_translator.core.translator.base import parse_response as parse_response
+from pdf_translator.core.translator.router import BackendRouter as BackendRouter
 
 logger = logging.getLogger(__name__)
 
 
 def detect_language(elements: list[Element]) -> str:
-    from langdetect import detect, LangDetectException
+    from langdetect import LangDetectException, detect
     text = " ".join(el.content for el in elements if el.content.strip())[:3000]
     if not text.strip():
         return "en"

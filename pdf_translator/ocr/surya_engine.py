@@ -20,11 +20,12 @@ class SuryaOCREngine:
 
     def extract(self, page_image: bytes, lang: str = "en") -> list[OCRResult]:
         try:
-            from surya.ocr import run_ocr
+            import io
+
+            from PIL import Image
             from surya.model.detection.model import load_model as load_det_model
             from surya.model.recognition.model import load_model as load_rec_model
-            from PIL import Image
-            import io
+            from surya.ocr import run_ocr
 
             image = Image.open(io.BytesIO(page_image))
             det_model = load_det_model()

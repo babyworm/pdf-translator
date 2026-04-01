@@ -1,0 +1,46 @@
+source,target,rule
+ETF,ETF,keep
+IPO,IPO,keep
+ROI,ROI,keep
+ROE,ROE,keep
+ROA,ROA,keep
+EBITDA,EBITDA,keep
+P/E,P/E,keep
+EPS,EPS,keep
+GDP,GDP,keep
+CPI,CPI,keep
+LIBOR,LIBOR,keep
+SWIFT,SWIFT,keep
+GAAP,GAAP,keep
+IFRS,IFRS,keep
+ESG,ESG,keep
+KPI,KPI,keep
+M&A,M&A,keep
+VC,VC,keep
+PE,PE,keep
+YoY,YoY,keep
+QoQ,QoQ,keep
+portfolio,포트폴리오,translate
+dividend,배당,translate
+equity,자본,translate
+liability,부채,translate
+revenue,매출,translate
+depreciation,감가상각,translate
+amortization,상각,translate
+hedge,헤지,translate
+derivative,파생상품,translate
+liquidity,유동성,translate
+solvency,지급능력,translate
+leverage,레버리지,translate
+underwriting,인수,translate
+securitization,증권화,translate
+yield,수익률,translate
+benchmark,벤치마크,translate
+volatility,변동성,translate
+cash flow,현금흐름,translate
+balance sheet,대차대조표,translate
+income statement,손익계산서,translate
+fiscal year,회계연도,translate
+due diligence,실사,translate
+collateral,담보,translate
+default,채무불이행,translate

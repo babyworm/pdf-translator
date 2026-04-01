@@ -1,7 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
-from pdf_translator.ocr.surya_engine import SuryaOCREngine
 from pdf_translator.ocr.base import OCRResult
+from pdf_translator.ocr.surya_engine import SuryaOCREngine
 
 
 def test_is_available_with_package():

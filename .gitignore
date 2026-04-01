@@ -10,5 +10,8 @@ output/
 .omx/
 .rtl-agent-team/
 .rat/
-.claude/worktrees/
+.claude/
+.superpowers/
 node_modules/
+pdf_translator/web/frontend/node_modules/
+pdf_translator_data/

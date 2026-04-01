@@ -1,0 +1,149 @@
+<h2>PDF Builder v2 — 레이아웃 보존 개선</h2>
+<p class="subtitle">현재 방식 vs 개선 방식 비교</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">❌ 현재: White Box Overlay</div>
+    <div class="mockup-body" style="padding: 16px; background: #fff; color: #333;">
+      <div style="border: 1px solid #ddd; padding: 12px; border-radius: 4px; margin-bottom: 12px;">
+        <div style="font-size: 11px; color: #999; margin-bottom: 8px;">원본 PDF 위에 흰 사각형 → 텍스트 삽입</div>
+        <div style="position: relative; background: #f5f5f5; padding: 16px; border-radius: 4px;">
+          <div style="font-weight: bold; font-size: 16px; color: #1a1a1a;">Introduction</div>
+          <div style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: #333;">
+            This paper presents a novel approach to neural machine translation...
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <div style="flex:1; border: 1px solid #ccc; padding: 6px; font-size: 11px; text-align: center;">Cell A</div>
+            <div style="flex:1; border: 1px solid #ccc; padding: 6px; font-size: 11px; text-align: center;">Cell B</div>
+          </div>
+        </div>
+        <div style="margin-top: 8px; font-size: 11px; color: #ef4444;">▼ 번역 후</div>
+        <div style="position: relative; background: #f5f5f5; padding: 16px; border-radius: 4px;">
+          <div style="background: white; padding: 2px 4px; font-size: 14px; color: #000; font-family: sans-serif; display: inline-block;">소개</div>
+          <div style="margin-top: 8px; background: white; padding: 2px 4px; font-size: 12px; color: #000; font-family: sans-serif; line-height: 1.2; overflow: hidden; max-height: 36px;">
+            본 논문은 신경 기계 번역에 대한 새로운 접근법을 제시합니다...
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <div style="flex:1; padding: 6px; font-size: 11px; text-align: center; position: relative;">
+              <div style="background: white; position: absolute; inset: 0;"></div>
+              <span style="position: relative; font-family: sans-serif;">셀 A</span>
+            </div>
+            <div style="flex:1; padding: 6px; font-size: 11px; text-align: center; position: relative;">
+              <div style="background: white; position: absolute; inset: 0;"></div>
+              <span style="position: relative; font-family: sans-serif;">셀 B</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #ef4444;">
+        <strong>문제점:</strong>
+        <ul style="margin: 4px 0; padding-left: 20px;">
+          <li>흰 박스가 테이블 경계선 덮음</li>
+          <li>원본 폰트/색상/크기 무시</li>
+          <li>텍스트 넘침 시 잘림</li>
+          <li>배경 그래픽 손상</li>
+          <li>2단 레이아웃 인식 못함</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">✅ 개선: Redaction + HTML Insert</div>
+    <div class="mockup-body" style="padding: 16px; background: #fff; color: #333;">
+      <div style="border: 1px solid #ddd; padding: 12px; border-radius: 4px; margin-bottom: 12px;">
+        <div style="font-size: 11px; color: #999; margin-bottom: 8px;">Redaction API로 텍스트만 제거 → insert_htmlbox로 스타일 삽입</div>
+        <div style="position: relative; background: #f5f5f5; padding: 16px; border-radius: 4px;">
+          <div style="font-weight: bold; font-size: 16px; color: #1a1a1a;">Introduction</div>
+          <div style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: #333;">
+            This paper presents a novel approach to neural machine translation...
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 0;">
+            <div style="flex:1; border: 1px solid #666; padding: 6px; font-size: 11px; text-align: center; background: #fafafa;">Cell A</div>
+            <div style="flex:1; border: 1px solid #666; padding: 6px; font-size: 11px; text-align: center; background: #fafafa;">Cell B</div>
+          </div>
+        </div>
+        <div style="margin-top: 8px; font-size: 11px; color: #10b981;">▼ 번역 후</div>
+        <div style="position: relative; background: #f5f5f5; padding: 16px; border-radius: 4px;">
+          <div style="font-weight: bold; font-size: 16px; color: #1a1a1a;">소개</div>
+          <div style="margin-top: 8px; font-size: 12px; line-height: 1.5; color: #333;">
+            본 논문은 신경 기계 번역에 대한 새로운 접근법을 제시합니다...
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 0;">
+            <div style="flex:1; border: 1px solid #666; padding: 6px; font-size: 11px; text-align: center; background: #fafafa;">셀 A</div>
+            <div style="flex:1; border: 1px solid #666; padding: 6px; font-size: 11px; text-align: center; background: #fafafa;">셀 B</div>
+          </div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: #10b981;">
+        <strong>개선점:</strong>
+        <ul style="margin: 4px 0; padding-left: 20px;">
+          <li>텍스트만 제거, 벡터/이미지 보존</li>
+          <li>원본 폰트 크기·색상·정렬 반영</li>
+          <li>CSS 기반 자동 줄바꿈·축소</li>
+          <li>테이블 셀 경계선 유지</li>
+          <li>fitz.Font.text_length 정확한 측정</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>구현 상세</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+    <div style="background: rgba(99,102,241,0.08); padding: 14px; border-radius: 8px;">
+      <div style="font-weight: bold; color: #6366f1; margin-bottom: 6px;">Step 1: Redact</div>
+      <div style="font-size: 12px; color: #aaa; line-height: 1.5;">
+        <code>page.add_redact_annot(rect)</code><br>
+        페이지 전체를 모아서<br>
+        <code>page.apply_redactions(</code><br>
+        <code>  images=0, graphics=0)</code><br>
+        → 텍스트만 삭제
+      </div>
+    </div>
+    <div style="background: rgba(16,185,129,0.08); padding: 14px; border-radius: 8px;">
+      <div style="font-weight: bold; color: #10b981; margin-bottom: 6px;">Step 2: Measure</div>
+      <div style="font-size: 12px; color: #aaa; line-height: 1.5;">
+        <code>font = fitz.Font("cjk")</code><br>
+        <code>width = font.text_length(</code><br>
+        <code>  text, fontsize)</code><br>
+        → 정확한 글리프 측정<br>
+        → rect에 맞게 fontsize 조정
+      </div>
+    </div>
+    <div style="background: rgba(245,158,11,0.08); padding: 14px; border-radius: 8px;">
+      <div style="font-weight: bold; color: #f59e0b; margin-bottom: 6px;">Step 3: Insert</div>
+      <div style="font-size: 12px; color: #aaa; line-height: 1.5;">
+        <code>page.insert_htmlbox(rect,</code><br>
+        <code>  html_with_css,</code><br>
+        <code>  scale_low=0)</code><br>
+        → 색상/폰트/정렬 CSS로<br>
+        → 자동 줄바꿈 + 축소
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <h3>추가 개선: 레이아웃 인식</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+    <div style="background: rgba(139,92,246,0.08); padding: 14px; border-radius: 8px;">
+      <div style="font-weight: bold; color: #8b5cf6; margin-bottom: 6px;">2단 레이아웃 감지</div>
+      <div style="font-size: 12px; color: #aaa; line-height: 1.5;">
+        Elements의 bbox x좌표 클러스터링으로<br>
+        단 구분 자동 감지. 왼쪽 단 → 오른쪽 단<br>
+        순서로 번역하여 읽기 순서 보존
+      </div>
+    </div>
+    <div style="background: rgba(236,72,153,0.08); padding: 14px; border-radius: 8px;">
+      <div style="font-weight: bold; color: #ec4899; margin-bottom: 6px;">텍스트 확장 처리</div>
+      <div style="font-size: 12px; color: #aaa; line-height: 1.5;">
+        EN→KO 번역 시 텍스트가 길어지는 경우<br>
+        1) fontsize 축소 (최소 4pt까지)<br>
+        2) insert_htmlbox scale_low=0 자동 축소<br>
+        3) 그래도 넘치면 ellipsis + 풀텍스트는 MD로
+      </div>
+    </div>
+  </div>
+</div>

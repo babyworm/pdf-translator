@@ -19,6 +19,18 @@ class TranslationCache:
             )"""
         )
         self._conn.commit()
+        self._dirty = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.flush()
+        self.close()
+        return False
+
+    def __reduce__(self):
+        raise TypeError("TranslationCache cannot be pickled (not safe across processes)")
 
     @staticmethod
     def _hash(text: str) -> str:
@@ -36,7 +48,13 @@ class TranslationCache:
             "INSERT OR REPLACE INTO translations (source_hash, source_lang, target_lang, translated) VALUES (?, ?, ?, ?)",
             (self._hash(source), source_lang, target_lang, translated),
         )
-        self._conn.commit()
+        self._dirty = True
+
+    def flush(self) -> None:
+        if self._dirty:
+            self._conn.commit()
+            self._dirty = False
 
     def close(self) -> None:
+        self.flush()
         self._conn.close()

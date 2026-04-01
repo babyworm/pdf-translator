@@ -1,5 +1,5 @@
-from pdf_translator.extractor import Element
-from pdf_translator.chunker import build_batches
+from pdf_translator.core.extractor import Element
+from pdf_translator.core.chunker import build_batches
 
 def _el(content: str, page: int = 1) -> Element:
     return Element(

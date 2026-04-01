@@ -1,5 +1,5 @@
 """Tests for table extraction — verifies table row end sentinels."""
-from pdf_translator.extractor import parse_elements
+from pdf_translator.core.extractor import parse_elements
 
 
 def test_table_rows_produce_sentinels():

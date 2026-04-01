@@ -1,9 +1,9 @@
 """Tests for translate_all with cache integration and index mapping."""
 import json
 from unittest.mock import patch, MagicMock
-from pdf_translator.extractor import Element
-from pdf_translator.cache import TranslationCache
-from pdf_translator.translator import translate_all
+from pdf_translator.core.extractor import Element
+from pdf_translator.core.cache import TranslationCache
+from pdf_translator.core.translator import translate_all
 
 
 def _el(content: str, page: int = 1) -> Element:
@@ -15,18 +15,19 @@ def _el(content: str, page: int = 1) -> Element:
 
 def _mock_worker(work_item):
     """In-process worker that returns mock translations."""
-    items, src, tgt, effort = work_item
+    items, src, tgt, effort, backend_name = work_item
     return [
         (item["global_idx"], f"[{tgt}]{item['content']}", item["content"])
         for item in items
+        if not item["cached"]
     ]
 
 
 def test_translate_all_no_cache():
     batches = [[_el("Hello"), _el("World")]]
 
-    with patch("pdf_translator.translator._worker_translate", side_effect=_mock_worker):
-        with patch("pdf_translator.translator.Pool") as MockPool:
+    with patch("pdf_translator.core.translator._worker_translate", side_effect=_mock_worker):
+        with patch("pdf_translator.core.translator.Pool") as MockPool:
             pool_inst = MockPool.return_value.__enter__.return_value
             pool_inst.map.side_effect = lambda fn, items: [fn(i) for i in items]
 
@@ -56,8 +57,8 @@ def test_translate_all_partial_cache():
 
     batches = [[_el("Hello"), _el("World")]]
 
-    with patch("pdf_translator.translator._worker_translate", side_effect=_mock_worker):
-        with patch("pdf_translator.translator.Pool") as MockPool:
+    with patch("pdf_translator.core.translator._worker_translate", side_effect=_mock_worker):
+        with patch("pdf_translator.core.translator.Pool") as MockPool:
             pool_inst = MockPool.return_value.__enter__.return_value
             pool_inst.map.side_effect = lambda fn, items: [fn(i) for i in items]
 
@@ -72,8 +73,8 @@ def test_translate_all_preserves_global_indices():
     """Multiple batches should maintain correct global indices."""
     batches = [[_el("A"), _el("B")], [_el("C")]]
 
-    with patch("pdf_translator.translator._worker_translate", side_effect=_mock_worker):
-        with patch("pdf_translator.translator.Pool") as MockPool:
+    with patch("pdf_translator.core.translator._worker_translate", side_effect=_mock_worker):
+        with patch("pdf_translator.core.translator.Pool") as MockPool:
             pool_inst = MockPool.return_value.__enter__.return_value
             pool_inst.map.side_effect = lambda fn, items: [fn(i) for i in items]
 

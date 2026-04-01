@@ -8,13 +8,15 @@ from pathlib import Path
 from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 
-from pdf_translator.config import TranslatorConfig
-from pdf_translator.extractor import extract_pdf
-from pdf_translator.chunker import build_batches
-from pdf_translator.cache import TranslationCache
-from pdf_translator.translator import translate_all, detect_language, is_codex_available, LANG_NAMES
-from pdf_translator.pdf_builder import build_pdf
-from pdf_translator.md_builder import build_markdown
+from pdf_translator.core.config import TranslatorConfig
+from pdf_translator.core.extractor import extract_pdf
+from pdf_translator.core.chunker import build_batches
+from pdf_translator.core.cache import TranslationCache
+from pdf_translator.core.translator import translate_all, detect_language
+from pdf_translator.core.translator.base import LANG_NAMES
+from pdf_translator.core.translator.router import BackendRouter
+from pdf_translator.core.pdf_builder import build_pdf
+from pdf_translator.core.md_builder import build_markdown
 
 console = Console()
 
@@ -22,7 +24,7 @@ console = Console()
 def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
     parser = argparse.ArgumentParser(
         prog="pdf-translator",
-        description="Translate PDF documents using Codex CLI",
+        description="Translate PDF documents with pluggable LLM backends",
     )
     parser.add_argument("input", help="Input PDF file path")
     parser.add_argument("--output-dir", default="./output", help="Output directory")
@@ -33,6 +35,8 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
     parser.add_argument("--effort", default="low", help="Codex reasoning effort")
     parser.add_argument("--pages", default=None, help="Pages to process (e.g. 1,3,5-7)")
     parser.add_argument("--no-cache", action="store_true", help="Disable translation cache")
+    parser.add_argument("--backend", default="auto",
+                        help="Translation backend (auto, codex, claude-cli, gemini-cli, google-translate)")
 
     args = parser.parse_args(argv)
     return TranslatorConfig(
@@ -44,6 +48,7 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
         effort=args.effort,
         pages=args.pages,
         use_cache=not args.no_cache,
+        backend=args.backend,
     )
 
 
@@ -70,12 +75,12 @@ def run(cfg: TranslatorConfig) -> None:
             lang_label = LANG_NAMES.get(cfg.source_lang, cfg.source_lang)
             console.print(f"  Detected language: [cyan]{lang_label}[/cyan]")
 
-        backend = "Codex CLI" if is_codex_available() else "Google Translate"
-        console.print(f"  Backend: [cyan]{backend}[/cyan]")
+        router = BackendRouter(effort=cfg.effort)
+        backend_obj = router.select(cfg.backend)
+        console.print(f"  Backend: [cyan]{backend_obj.name}[/cyan]")
         progress.update(task, advance=1)
 
         progress.update(task, description="Building batches...")
-        # Track original indices for elements that enter batches
         valid_indices = [i for i, el in enumerate(elements) if el.content.strip()]
         batches = build_batches(elements)
         console.print(f"  Created [cyan]{len(batches)}[/cyan] translation batches")
@@ -83,11 +88,8 @@ def run(cfg: TranslatorConfig) -> None:
 
         progress.update(task, description=f"Translating ({cfg.workers} workers)...")
         workers = max(1, cfg.workers)
-        cache = None
+        cache = TranslationCache(output_dir / "cache.db") if cfg.use_cache else None
         try:
-            if cfg.use_cache:
-                cache = TranslationCache(output_dir / "cache.db")
-
             raw_translations = translate_all(
                 batches,
                 source_lang=cfg.source_lang,
@@ -95,8 +97,8 @@ def run(cfg: TranslatorConfig) -> None:
                 effort=cfg.effort,
                 workers=workers,
                 cache=cache,
+                backend=cfg.backend,
             )
-            # Remap batch-local indices to original element indices
             translations = {
                 valid_indices[gi]: text
                 for gi, text in raw_translations.items()
@@ -106,7 +108,6 @@ def run(cfg: TranslatorConfig) -> None:
             progress.update(task, advance=1)
 
             progress.update(task, description="Generating output...")
-
             pdf_out = str(output_dir / f"{stem}_translated.pdf")
             build_pdf(str(input_path), pdf_out, elements, translations)
             console.print(f"  PDF: [green]{pdf_out}[/green]")
@@ -119,6 +120,7 @@ def run(cfg: TranslatorConfig) -> None:
             progress.update(task, advance=1)
         finally:
             if cache:
+                cache.flush()
                 cache.close()
 
     console.print("[bold green]Done![/bold green]")

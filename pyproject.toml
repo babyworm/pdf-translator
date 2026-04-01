@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pdf-translator = "pdf_translator.cli:main"
+pdf-translator = "pdf_translator.cli.main:main"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

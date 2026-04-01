@@ -10,12 +10,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 interface Props {
   projectId: string
   currentPage: number
-  onPageChange: (page: number) => void
-  totalPages: number
   onTotalPages: (total: number) => void
 }
 
-export function PdfViewer({ projectId, currentPage, onPageChange, totalPages, onTotalPages }: Props) {
+export function PdfViewer({ projectId, currentPage, onTotalPages }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [pdf, setPdf] = useState<pdfjsLib.PDFDocumentProxy | null>(null)
   const [loading, setLoading] = useState(true)
@@ -69,23 +67,6 @@ export function PdfViewer({ projectId, currentPage, onPageChange, totalPages, on
 
   return (
     <div ref={containerRef} className="h-full flex flex-col">
-      {/* Page navigation */}
-      <div className="flex items-center justify-center gap-2 py-2 border-b border-gray-800 text-xs">
-        <button onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-          disabled={currentPage <= 1}
-          className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded disabled:opacity-30">
-          &larr;
-        </button>
-        <span className="text-gray-400">
-          Page {currentPage} / {totalPages}
-        </span>
-        <button onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-          disabled={currentPage >= totalPages}
-          className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded disabled:opacity-30">
-          &rarr;
-        </button>
-      </div>
-      {/* Canvas */}
       <div className="flex-1 overflow-auto p-4 flex justify-center bg-gray-900/50">
         <canvas ref={canvasRef} className="shadow-lg" />
       </div>

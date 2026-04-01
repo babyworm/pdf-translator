@@ -5,6 +5,7 @@ import { TranslatedPanel } from '../components/TranslatedPanel'
 import { GlossaryPanel } from '../components/GlossaryPanel'
 import { StatusBar } from '../components/StatusBar'
 import { PdfViewer } from '../components/PdfViewer'
+import { PageNav } from '../components/PageNav'
 import { useWebSocket } from '../hooks/useWebSocket'
 import type { Project, Draft } from '../types'
 
@@ -29,6 +30,19 @@ export function TranslationView() {
       getDraft(id).then(setDraft)
     }
   }, [progress, id])
+
+  // Keyboard navigation for page changes
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' && currentPage > 1) {
+        setCurrentPage(p => p - 1)
+      } else if (e.key === 'ArrowRight' && currentPage < totalPages) {
+        setCurrentPage(p => p + 1)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentPage, totalPages])
 
   const handleStartTranslation = async () => {
     if (!id) return
@@ -60,6 +74,8 @@ export function TranslationView() {
         </div>
       </div>
 
+      <PageNav currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+
       {/* Error state */}
       {project.status === 'error' && (
         <div className="bg-red-950/50 border border-red-800 rounded-lg p-4 mx-4 mt-4">
@@ -83,8 +99,6 @@ export function TranslationView() {
             <PdfViewer
               projectId={id!}
               currentPage={currentPage}
-              onPageChange={setCurrentPage}
-              totalPages={totalPages}
               onTotalPages={setTotalPages}
             />
           ) : (
@@ -96,8 +110,9 @@ export function TranslationView() {
 
         {/* Right: Translated */}
         <div className="flex-1 flex flex-col">
-          <div className="px-3 py-2 bg-gray-900/50 text-xs text-gray-500 border-b border-gray-800">
-            Translated ({project.target_lang || 'ko'}) -- Click to edit
+          <div className="px-3 py-2 bg-gray-900/50 text-xs text-gray-500 border-b border-gray-800 flex justify-between">
+            <span>Translated ({project.target_lang || 'ko'}) -- Click to edit</span>
+            {totalPages > 0 && <span>Page {currentPage} / {totalPages}</span>}
           </div>
           <div className="flex-1 overflow-y-auto p-4">
             {draft ? (

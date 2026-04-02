@@ -1,7 +1,7 @@
 import tempfile
 from pathlib import Path
 
-import fitz
+from reportlab.pdfgen import canvas
 
 from pdf_translator.core.extractor import Element, _ocr_fallback, _parse_pages
 from pdf_translator.ocr.base import OCRResult
@@ -22,22 +22,19 @@ class FakeOCREngine:
 
 def _make_empty_pdf(path):
     """PDF with no text (simulates scanned doc)."""
-    doc = fitz.open()
-    doc.new_page()
-    doc.save(str(path))
-    doc.close()
+    c = canvas.Canvas(str(path))
+    c.showPage()  # create a blank page with no text
+    c.save()
 
 
 def _make_text_pdf(path):
     """PDF with text."""
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "Hello World", fontsize=12)
-    page.insert_text((72, 130), "Second line", fontsize=12)
-    page.insert_text((72, 160), "Third line here", fontsize=12)
-    page.insert_text((72, 190), "Fourth element", fontsize=12)
-    doc.save(str(path))
-    doc.close()
+    c = canvas.Canvas(str(path))
+    c.drawString(72, 700, "Hello World")
+    c.drawString(72, 670, "Second line")
+    c.drawString(72, 640, "Third line here")
+    c.drawString(72, 610, "Fourth element")
+    c.save()
 
 
 def test_ocr_fallback_returns_elements():
@@ -55,12 +52,14 @@ def test_ocr_fallback_returns_elements():
 def test_ocr_fallback_with_pages():
     with tempfile.TemporaryDirectory() as d:
         pdf = Path(d) / "scan.pdf"
-        doc = fitz.open()
-        doc.new_page()
-        doc.new_page()
-        doc.new_page()
-        doc.save(str(pdf))
-        doc.close()
+        # Create a 3-page PDF
+        c = canvas.Canvas(str(pdf))
+        c.drawString(72, 700, "Page 1")
+        c.showPage()
+        c.drawString(72, 700, "Page 2")
+        c.showPage()
+        c.drawString(72, 700, "Page 3")
+        c.save()
 
         engine = FakeOCREngine()
         elements = _ocr_fallback(str(pdf), engine, pages="1,3")

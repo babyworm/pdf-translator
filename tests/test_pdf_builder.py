@@ -1,18 +1,17 @@
 import tempfile
 from pathlib import Path
 
-import fitz  # PyMuPDF
+from pypdf import PdfReader
+from reportlab.pdfgen import canvas
 
 from pdf_translator.core.extractor import Element
 from pdf_translator.core.pdf_builder import _builtin_cjk_fontname, build_pdf
 
 
 def _create_test_pdf(path: str, text: str = "Hello World") -> None:
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), text, fontsize=12)
-    doc.save(path)
-    doc.close()
+    c = canvas.Canvas(path)
+    c.drawString(72, 700, text)
+    c.save()
 
 
 def test_build_pdf_creates_file():
@@ -49,9 +48,8 @@ def test_build_pdf_contains_translated_text():
         translations = {0: "안녕 세계"}
         build_pdf(src, dst, elements, translations)
 
-        doc = fitz.open(dst)
-        page_text = doc[0].get_text()
-        doc.close()
+        reader = PdfReader(dst)
+        page_text = reader.pages[0].extract_text() or ""
         assert "안녕" in page_text
 
 
@@ -101,7 +99,6 @@ def test_build_pdf_japanese_text():
         translations = {0: "こんにちは"}
         build_pdf(src, dst, elements, translations)
 
-        doc = fitz.open(dst)
-        page_text = doc[0].get_text()
-        doc.close()
+        reader = PdfReader(dst)
+        page_text = reader.pages[0].extract_text() or ""
         assert "こんにちは" in page_text

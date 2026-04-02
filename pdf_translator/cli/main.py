@@ -297,7 +297,8 @@ def check_deps():
     console.print("[bold]Core:[/bold]")
     _check("Python 3.10+", lambda: sys.version_info >= (3, 10))
     _check("Java", lambda: shutil.which("java") is not None, "brew install openjdk@21")
-    _check("PyMuPDF", lambda: __import__("fitz") and True, "pip install PyMuPDF")
+    _check("pypdf", lambda: __import__("pypdf") and True, "pip install pypdf")
+    _check("reportlab", lambda: __import__("reportlab") and True, "pip install reportlab")
     _check("langdetect", lambda: __import__("langdetect") and True, "pip install langdetect")
     _check("deep_translator", lambda: __import__("deep_translator") and True, "pip install deep-translator")
 

@@ -1,7 +1,8 @@
 import tempfile
 from pathlib import Path
 
-import fitz
+from pypdf import PdfReader
+from reportlab.pdfgen import canvas
 
 from pdf_translator.ocr.base import OCREngine, OCRResult
 from pdf_translator.ocr.detector import detect_pdf_type, is_scanned_page
@@ -27,36 +28,38 @@ def test_fake_ocr_satisfies_protocol():
 
 
 def test_is_scanned_page_text():
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "This is a text page with enough content to detect.", fontsize=12)
-    assert is_scanned_page(page, threshold=10) is False
-    doc.close()
+    with tempfile.TemporaryDirectory() as d:
+        path = str(Path(d) / "text.pdf")
+        c = canvas.Canvas(path)
+        c.drawString(72, 700, "This is a text page with enough content to detect.")
+        c.save()
+        reader = PdfReader(path)
+        assert is_scanned_page(reader.pages[0], threshold=10) is False
 
 
 def test_is_scanned_page_empty():
-    doc = fitz.open()
-    page = doc.new_page()
-    assert is_scanned_page(page, threshold=10) is True
-    doc.close()
+    with tempfile.TemporaryDirectory() as d:
+        path = str(Path(d) / "empty.pdf")
+        c = canvas.Canvas(path)
+        c.showPage()  # create a blank page with no text
+        c.save()
+        reader = PdfReader(path)
+        assert is_scanned_page(reader.pages[0], threshold=10) is True
 
 
 def test_detect_pdf_type_text():
     with tempfile.TemporaryDirectory() as d:
         path = str(Path(d) / "text.pdf")
-        doc = fitz.open()
-        page = doc.new_page()
-        page.insert_text((72, 100), "A " * 50, fontsize=12)
-        doc.save(path)
-        doc.close()
+        c = canvas.Canvas(path)
+        c.drawString(72, 700, "A " * 50)
+        c.save()
         assert detect_pdf_type(path) == "text"
 
 
 def test_detect_pdf_type_scanned():
     with tempfile.TemporaryDirectory() as d:
         path = str(Path(d) / "scanned.pdf")
-        doc = fitz.open()
-        doc.new_page()
-        doc.save(path)
-        doc.close()
+        c = canvas.Canvas(path)
+        c.showPage()  # create a blank page with no text
+        c.save()
         assert detect_pdf_type(path) == "scanned"

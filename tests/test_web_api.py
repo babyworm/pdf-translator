@@ -1,7 +1,7 @@
 
-import fitz
 import pytest
 from fastapi.testclient import TestClient
+from reportlab.pdfgen import canvas
 
 from pdf_translator.web.app import create_app
 
@@ -13,11 +13,9 @@ def client(tmp_path):
 
 
 def _make_pdf(path):
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "Hello World", fontsize=12)
-    doc.save(str(path))
-    doc.close()
+    c = canvas.Canvas(str(path))
+    c.drawString(72, 700, "Hello World")
+    c.save()
 
 
 def test_health(client):

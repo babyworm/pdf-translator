@@ -1,19 +1,18 @@
 import tempfile
 from pathlib import Path
 
-import fitz
+from pypdf import PdfReader
+from reportlab.pdfgen import canvas
 
 from pdf_translator.core.extractor import Element
-from pdf_translator.core.pdf_builder import _fit_fontsize_v2, _sample_background_color, build_pdf
+from pdf_translator.core.pdf_builder import _fit_fontsize, build_pdf
 
 
 def _create_test_pdf(path: str) -> None:
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "Hello World", fontsize=14, color=(0, 0, 0))
-    page.insert_text((72, 140), "Test paragraph.", fontsize=12, color=(0.2, 0.2, 0.8))
-    doc.save(path)
-    doc.close()
+    c = canvas.Canvas(path)
+    c.drawString(72, 700, "Hello World")
+    c.drawString(72, 660, "Test paragraph.")
+    c.save()
 
 
 def test_build_pdf_creates_output():
@@ -27,46 +26,34 @@ def test_build_pdf_creates_output():
         ]
         build_pdf(src, dst, elements, {0: "안녕 세계"})
         assert Path(dst).exists()
-        doc = fitz.open(dst)
-        assert len(doc) >= 1
-        doc.close()
+        reader = PdfReader(dst)
+        assert len(reader.pages) >= 1
 
 
 def test_build_pdf_preserves_pages():
     with tempfile.TemporaryDirectory() as d:
         src = str(Path(d) / "src.pdf")
         dst = str(Path(d) / "dst.pdf")
-        doc = fitz.open()
-        doc.new_page()
-        doc.new_page()
-        doc.save(src)
-        doc.close()
+        # Create a 2-page PDF with reportlab
+        c = canvas.Canvas(src)
+        c.drawString(72, 700, "Page 1")
+        c.showPage()
+        c.drawString(72, 700, "Page 2")
+        c.save()
         build_pdf(src, dst, [], {})
-        out = fitz.open(dst)
-        assert len(out) == 2
-        out.close()
+        reader = PdfReader(dst)
+        assert len(reader.pages) == 2
 
 
-def test_fit_fontsize_v2_respects_height():
-    rect = fitz.Rect(0, 0, 100, 20)
+def test_fit_fontsize_respects_height():
     long_text = "A" * 200
-    size = _fit_fontsize_v2(long_text, rect, 14.0)
+    size = _fit_fontsize(long_text, 100, 20, 14.0)
     assert size <= 14.0
     assert size >= 4.0
 
 
-def test_sample_background_color_white():
-    doc = fitz.open()
-    page = doc.new_page()
-    rect = fitz.Rect(10, 10, 50, 50)
-    pixmap = page.get_pixmap(clip=rect)
-    color = _sample_background_color(pixmap)
-    assert all(c > 0.95 for c in color)
-    doc.close()
-
-
 def test_build_pdf_scanned_mode():
-    """Scanned mode should use background color fill instead of redaction."""
+    """Scanned mode should produce a valid output PDF."""
     with tempfile.TemporaryDirectory() as d:
         src = str(Path(d) / "src.pdf")
         dst = str(Path(d) / "dst.pdf")

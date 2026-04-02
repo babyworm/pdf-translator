@@ -1,7 +1,7 @@
 """Tests for the public Python API (pdf_translator.core.translate_pdf)."""
 from unittest.mock import patch
 
-import fitz
+from reportlab.pdfgen import canvas
 
 
 def test_core_imports():
@@ -13,11 +13,9 @@ def test_translate_pdf_with_mock(tmp_path):
     from pdf_translator.core import translate_pdf
 
     pdf_path = tmp_path / "test.pdf"
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "Hello", fontsize=12)
-    doc.save(str(pdf_path))
-    doc.close()
+    c = canvas.Canvas(str(pdf_path))
+    c.drawString(72, 700, "Hello")
+    c.save()
 
     with patch("pdf_translator.core.extract_pdf", return_value=[]):
         result = translate_pdf(str(pdf_path), target_lang="ko", output_dir=str(tmp_path))

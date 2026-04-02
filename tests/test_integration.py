@@ -3,20 +3,20 @@ import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import fitz
+from reportlab.pdfgen import canvas
 
 from pdf_translator.cli.main import run
 from pdf_translator.core.config import TranslatorConfig
 
 
 def _create_test_pdf(path: str) -> None:
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "Introduction", fontsize=18)
-    page.insert_text((72, 140), "This is a test document.", fontsize=12)
-    page.insert_text((72, 160), "It has multiple sentences.", fontsize=12)
-    doc.save(path)
-    doc.close()
+    c = canvas.Canvas(path)
+    c.setFont("Helvetica", 18)
+    c.drawString(72, 700, "Introduction")
+    c.setFont("Helvetica", 12)
+    c.drawString(72, 660, "This is a test document.")
+    c.drawString(72, 640, "It has multiple sentences.")
+    c.save()
 
 
 def test_end_to_end_with_mock_codex():

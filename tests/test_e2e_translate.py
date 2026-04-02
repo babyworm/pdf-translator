@@ -2,8 +2,9 @@
 from pathlib import Path
 from unittest.mock import patch
 
-import fitz
 import pytest
+from pypdf import PdfReader
+from reportlab.pdfgen import canvas
 
 from pdf_translator.core import translate_pdf
 from pdf_translator.core.extractor import Element
@@ -12,13 +13,13 @@ from pdf_translator.core.translator.backends.google_translate import GoogleTrans
 
 
 def _create_test_pdf(path: str) -> None:
-    doc = fitz.open()
-    page = doc.new_page()
-    page.insert_text((72, 100), "Introduction", fontsize=18)
-    page.insert_text((72, 140), "The transformer model has revolutionized NLP.", fontsize=12)
-    page.insert_text((72, 170), "We present results on standard benchmarks.", fontsize=12)
-    doc.save(path)
-    doc.close()
+    c = canvas.Canvas(path)
+    c.setFont("Helvetica", 18)
+    c.drawString(72, 700, "Introduction")
+    c.setFont("Helvetica", 12)
+    c.drawString(72, 660, "The transformer model has revolutionized NLP.")
+    c.drawString(72, 630, "We present results on standard benchmarks.")
+    c.save()
 
 
 def _mock_elements() -> list[Element]:
@@ -87,9 +88,8 @@ class TestFullPipelineE2E:
                 output_dir=str(tmp_path / "output"), use_cache=False,
             )
 
-        doc = fitz.open(result["pdf_path"])
-        text = doc[0].get_text()
-        doc.close()
+        reader = PdfReader(result["pdf_path"])
+        text = reader.pages[0].extract_text() or ""
         assert any(0xAC00 <= ord(c) <= 0xD7AF for c in text)
 
     def test_output_markdown_has_korean(self, test_pdf, tmp_path):

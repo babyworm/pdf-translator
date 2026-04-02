@@ -28,8 +28,10 @@ def main():
                      "Python 3.10+ required")
     all_ok &= check("Java", lambda: shutil.which("java") is not None,
                      "brew install openjdk@21 (macOS) / apt install openjdk-21-jdk (Ubuntu)")
-    all_ok &= check("PyMuPDF", lambda: __import__("fitz") and True,
-                     "pip install PyMuPDF")
+    all_ok &= check("pypdf", lambda: __import__("pypdf") and True,
+                     "pip install pypdf")
+    all_ok &= check("reportlab", lambda: __import__("reportlab") and True,
+                     "pip install reportlab")
     all_ok &= check("rich", lambda: __import__("rich") and True,
                      "pip install rich")
     all_ok &= check("langdetect", lambda: __import__("langdetect") and True,

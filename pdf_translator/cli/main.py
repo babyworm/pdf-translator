@@ -266,8 +266,93 @@ def run(cfg: TranslatorConfig) -> None:
             else:
                 progress.update(task, description="Generating output...")
                 pdf_out = str(output_dir / f"{stem}_translated.pdf")
-                build_pdf(str(input_path), pdf_out, elements, translations)
-                console.print(f"  PDF: [green]{pdf_out}[/green]")
+
+                if cfg.no_qa:
+                    build_pdf(str(input_path), pdf_out, elements, translations)
+                    console.print(f"  PDF: [green]{pdf_out}[/green]")
+                else:
+                    from pdf_translator.core.qa import (
+                        collect_retranslate_indices,
+                        detect_post_build_issues,
+                        detect_pre_build_issues,
+                        review_post_build,
+                        review_pre_build,
+                    )
+
+                    qa_backend = None
+                    if hasattr(backend_obj, "translate_raw"):
+                        qa_backend = backend_obj
+
+                    for retry in range(cfg.qa_retries + 1):
+                        # Pre-build review
+                        pre_results = []
+                        pre_issues = detect_pre_build_issues(elements, translations)
+                        if pre_issues and qa_backend:
+                            console.print(f"  QA pre-build: [yellow]{len(pre_issues)} issues[/yellow]")
+                            pre_results = review_pre_build(
+                                pre_issues, qa_backend, cfg.source_lang, cfg.target_lang,
+                            )
+                            # Apply revisions
+                            for item in pre_results:
+                                if item.get("action") == "revise" and item.get("text"):
+                                    translations[item["index"]] = item["text"]
+                                elif item.get("action") == "skip" and item["index"] in translations:
+                                    del translations[item["index"]]
+                        elif pre_issues:
+                            console.print(f"  QA pre-build: [yellow]{len(pre_issues)} issues (rule-based only)[/yellow]")
+
+                        # Build PDF
+                        build_pdf(str(input_path), pdf_out, elements, translations)
+
+                        # Post-build QA (skip on last retry)
+                        if retry == cfg.qa_retries:
+                            break
+
+                        post_issues = detect_post_build_issues(
+                            str(input_path), pdf_out, elements, translations,
+                        )
+                        if not post_issues:
+                            console.print("  QA post-build: [green]pass[/green]")
+                            break
+
+                        post_results = []
+                        if qa_backend:
+                            post_results = review_post_build(
+                                post_issues, qa_backend, cfg.source_lang, cfg.target_lang,
+                            )
+
+                        failed = collect_retranslate_indices(pre_results, post_results)
+                        if not failed:
+                            console.print("  QA post-build: [green]pass (no retranslate needed)[/green]")
+                            break
+
+                        console.print(
+                            f"  QA retry {retry + 1}/{cfg.qa_retries}: "
+                            f"re-translating [yellow]{len(failed)}[/yellow] segments"
+                        )
+
+                        # Re-translate failed segments only
+                        failed_elements = [
+                            [el for i, el in enumerate(elements) if i in failed]
+                        ]
+                        if failed_elements[0]:
+                            re_raw = translate_all(
+                                failed_elements,
+                                source_lang=cfg.source_lang,
+                                target_lang=cfg.target_lang,
+                                effort=cfg.effort,
+                                workers=max(1, cfg.workers),
+                                cache=None,
+                                backend=cfg.backend,
+                                glossary=glossary_dict,
+                                layout_aware=True,
+                            )
+                            failed_list = sorted(failed)
+                            for re_idx, text in re_raw.items():
+                                if re_idx < len(failed_list) and text:
+                                    translations[failed_list[re_idx]] = text
+
+                    console.print(f"  PDF: [green]{pdf_out}[/green]")
 
                 md_out = output_dir / f"{stem}_translated.md"
                 md_content = build_markdown(elements, translations)

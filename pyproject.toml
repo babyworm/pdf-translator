@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-translator"
-version = "2.1.0"
+version = "2.2.0"
 description = "Translate PDF documents with pluggable LLM backends, preserving original layout"
 readme = "README.md"
 license = {text = "MIT"}

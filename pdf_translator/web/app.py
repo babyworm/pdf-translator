@@ -4,6 +4,8 @@ import csv
 import io
 import json
 import threading
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -79,15 +81,17 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
 
     db = Database(data_path / "app.db")
     ws_manager = ConnectionManager()
-    app = FastAPI(title="PDF Translator")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        yield
+        db.close()
+
+    app = FastAPI(title="PDF Translator", lifespan=lifespan)
     app.state.db = db
     app.state.data_dir = data_path
     app.state.uploads_dir = uploads_dir
     app.state.ws_manager = ws_manager
-
-    @app.on_event("shutdown")
-    def shutdown():
-        db.close()
 
     # --- Health ---
     @app.get("/api/health")

@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 from reportlab.pdfgen import canvas
 
@@ -111,3 +112,61 @@ class TestPostBuildDetection:
             translations = {0: "안녕 세계"}
             issues = detect_post_build_issues(str(src), str(built), elements, translations)
             assert len(issues) >= 1
+
+
+class TestLLMReview:
+    def test_review_pre_build_calls_backend(self):
+        from pdf_translator.core.qa import review_pre_build
+        backend = MagicMock()
+        backend.translate_raw.return_value = '[{"index": 0, "action": "revise", "text": "수정됨", "reason": "test"}]'
+        issues = [{"index": 0, "original": "Hi", "translated": "", "type": "paragraph",
+                   "bbox_w": 100, "bbox_h": 20, "issue": "empty"}]
+        result = review_pre_build(issues, backend, "en", "ko")
+        assert len(result) == 1
+        assert result[0]["action"] == "revise"
+        backend.translate_raw.assert_called_once()
+
+    def test_review_post_build_calls_backend(self):
+        from pdf_translator.core.qa import review_post_build
+        backend = MagicMock()
+        backend.translate_raw.return_value = '[{"page": 1, "verdict": "fail", "failed_indices": [2], "reason": "missing"}]'
+        issues = [{"page": 1, "expected_segments": 5, "extracted_text": "test",
+                   "original_text": "orig", "issues": ["only 2 of 5"]}]
+        result = review_post_build(issues, backend, "en", "ko")
+        assert result[0]["verdict"] == "fail"
+
+    def test_review_pre_build_no_backend(self):
+        from pdf_translator.core.qa import review_pre_build
+        issues = [{"index": 0, "issue": "test"}]
+        result = review_pre_build(issues, None, "en", "ko")
+        assert result == []
+
+
+class TestCollectRetranslate:
+    def test_collect_from_pre_revise(self):
+        from pdf_translator.core.qa import collect_retranslate_indices
+        pre = [{"index": 3, "action": "revise", "text": "새 번역"}]
+        post = []
+        indices = collect_retranslate_indices(pre, post)
+        assert 3 in indices
+
+    def test_collect_from_post_fail(self):
+        from pdf_translator.core.qa import collect_retranslate_indices
+        pre = []
+        post = [{"page": 1, "verdict": "fail", "failed_indices": [5, 8]}]
+        indices = collect_retranslate_indices(pre, post)
+        assert indices == {5, 8}
+
+    def test_collect_merged(self):
+        from pdf_translator.core.qa import collect_retranslate_indices
+        pre = [{"index": 2, "action": "revise", "text": "x"}]
+        post = [{"page": 1, "verdict": "fail", "failed_indices": [4]}]
+        indices = collect_retranslate_indices(pre, post)
+        assert indices == {2, 4}
+
+    def test_collect_skip_keep(self):
+        from pdf_translator.core.qa import collect_retranslate_indices
+        pre = [{"index": 1, "action": "keep"}, {"index": 2, "action": "skip"}]
+        post = [{"page": 1, "verdict": "pass"}]
+        indices = collect_retranslate_indices(pre, post)
+        assert len(indices) == 0

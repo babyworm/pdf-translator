@@ -5,6 +5,12 @@ import logging
 from pypdf import PdfReader
 
 from pdf_translator.core.extractor import Element
+from pdf_translator.core.translator.base import (
+    build_qa_post_prompt,
+    build_qa_pre_prompt,
+    parse_qa_post_response,
+    parse_qa_pre_response,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,3 +148,54 @@ def detect_post_build_issues(
             })
 
     return issues
+
+
+def review_pre_build(
+    issues: list[dict],
+    backend,
+    source_lang: str,
+    target_lang: str,
+) -> list[dict]:
+    """Send pre-build issues to LLM for review. Returns action list."""
+    if not backend or not hasattr(backend, "translate_raw"):
+        return []
+    prompt = build_qa_pre_prompt(issues, source_lang, target_lang)
+    response = backend.translate_raw(prompt, count=len(issues))
+    if response:
+        return parse_qa_pre_response(response)
+    return []
+
+
+def review_post_build(
+    issues: list[dict],
+    backend,
+    source_lang: str,
+    target_lang: str,
+) -> list[dict]:
+    """Send post-build issues to LLM for review. Returns verdict list."""
+    if not backend or not hasattr(backend, "translate_raw"):
+        return []
+    prompt = build_qa_post_prompt(issues)
+    response = backend.translate_raw(prompt, count=len(issues))
+    if response:
+        return parse_qa_post_response(response)
+    return []
+
+
+def collect_retranslate_indices(
+    pre_results: list[dict],
+    post_results: list[dict],
+) -> set[int]:
+    """Collect indices that need re-translation from both QA stages."""
+    indices: set[int] = set()
+
+    for item in pre_results:
+        if item.get("action") == "revise":
+            indices.add(item["index"])
+
+    for item in post_results:
+        if item.get("verdict") == "fail":
+            for idx in item.get("failed_indices", []):
+                indices.add(idx)
+
+    return indices

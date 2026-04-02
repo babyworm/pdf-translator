@@ -299,14 +299,19 @@ def build_pdf(
             # so we rely on the registered TTFont.
 
             # Determine text color
+            # opendataloader-pdf returns colors as 0-1 floats (not 0-255 ints)
+            # May be grayscale [0.5] or RGB [1.0, 0.0, 0.0]
             text_color = (0.0, 0.0, 0.0)
-            if el.text_color and len(el.text_color) >= 3:
+            if el.text_color:
                 try:
-                    text_color = (
-                        float(el.text_color[0]) / 255.0,
-                        float(el.text_color[1]) / 255.0,
-                        float(el.text_color[2]) / 255.0,
-                    )
+                    vals = [float(v) for v in el.text_color]
+                    # Detect 0-255 range and normalize
+                    if any(v > 1.0 for v in vals):
+                        vals = [v / 255.0 for v in vals]
+                    if len(vals) == 1:
+                        text_color = (vals[0], vals[0], vals[0])  # grayscale
+                    elif len(vals) >= 3:
+                        text_color = (vals[0], vals[1], vals[2])
                 except (ValueError, TypeError):
                     pass
 

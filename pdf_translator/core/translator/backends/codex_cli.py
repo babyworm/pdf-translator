@@ -16,9 +16,10 @@ class CodexCLIBackend:
     name = "codex"
     backend_type = "cli"
 
-    def __init__(self, effort: str = "low", max_retries: int = 2):
+    def __init__(self, effort: str = "low", max_retries: int = 2, timeout: int = 300):
         self.effort = effort
         self.max_retries = max_retries
+        self.timeout = timeout
 
     def is_available(self) -> bool:
         return shutil.which("codex") is not None
@@ -42,7 +43,7 @@ class CodexCLIBackend:
                     cmd += ["-c", f"reasoning_effort={self.effort}"]
                 proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 try:
-                    proc.communicate(input=prompt, timeout=120)
+                    proc.communicate(input=prompt, timeout=self.timeout)
                 except subprocess.TimeoutExpired:
                     proc.kill()
                     proc.wait()

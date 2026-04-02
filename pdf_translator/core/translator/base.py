@@ -187,3 +187,68 @@ def parse_response(response: str, count: int) -> list[str | None]:
     if len(lines) >= count:
         return lines[:count]
     return lines + [None] * (count - len(lines))
+
+
+def build_qa_pre_prompt(issues: list[dict], source_lang: str, target_lang: str) -> str:
+    src_name = LANG_NAMES.get(source_lang, source_lang)
+    tgt_name = LANG_NAMES.get(target_lang, target_lang)
+    return f"""You are a translation quality reviewer ({src_name} → {tgt_name}).
+
+Review each flagged translation issue and decide an action:
+- "keep": the current translation is acceptable despite the flag
+- "revise": provide a better translation (include "text" field)
+- "skip": keep the original text, do not translate this element
+
+Output ONLY a JSON array: [{{"index": N, "action": "keep"|"revise"|"skip", "text": "...", "reason": "..."}}]
+For "keep" and "skip", omit "text".
+
+Flagged issues:
+{json.dumps(issues, ensure_ascii=False, indent=2)}"""
+
+
+def build_qa_post_prompt(issues: list[dict]) -> str:
+    return f"""You are a PDF translation quality reviewer.
+
+I built a translated PDF but detected potential problems on some pages.
+For each page, decide:
+- "pass": the page is acceptable
+- "fail": the page has problems — list the segment indices that need re-translation in "failed_indices"
+
+Output ONLY a JSON array: [{{"page": N, "verdict": "pass"|"fail", "failed_indices": [...], "reason": "..."}}]
+
+Detected issues:
+{json.dumps(issues, ensure_ascii=False, indent=2)}"""
+
+
+def parse_qa_pre_response(response: str) -> list[dict]:
+    """Parse pre-build QA response. Returns list of action dicts."""
+    response = response.strip()
+    try:
+        fence_match = re.search(r"```(?:json)?\s*\n(.*?)```", response, re.DOTALL)
+        if fence_match:
+            response = fence_match.group(1).strip()
+        bracket_start = response.find("[")
+        bracket_end = response.rfind("]")
+        if bracket_start >= 0 and bracket_end > bracket_start:
+            response = response[bracket_start:bracket_end + 1]
+        return json.loads(response)
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.warning("Failed to parse QA pre response: %s", exc)
+        return []
+
+
+def parse_qa_post_response(response: str) -> list[dict]:
+    """Parse post-build QA response. Returns list of verdict dicts."""
+    response = response.strip()
+    try:
+        fence_match = re.search(r"```(?:json)?\s*\n(.*?)```", response, re.DOTALL)
+        if fence_match:
+            response = fence_match.group(1).strip()
+        bracket_start = response.find("[")
+        bracket_end = response.rfind("]")
+        if bracket_start >= 0 and bracket_end > bracket_start:
+            response = response[bracket_start:bracket_end + 1]
+        return json.loads(response)
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.warning("Failed to parse QA post response: %s", exc)
+        return []

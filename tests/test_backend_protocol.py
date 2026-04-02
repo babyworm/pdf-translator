@@ -92,6 +92,49 @@ def test_parse_response_with_action_fallback():
     assert result[0]["text"] == "초록"
 
 
+def test_build_qa_pre_prompt():
+    from pdf_translator.core.translator.base import build_qa_pre_prompt
+    issues = [
+        {"index": 0, "original": "Hello", "translated": "", "type": "paragraph",
+         "bbox_w": 100, "bbox_h": 20, "issue": "empty translation"},
+    ]
+    prompt = build_qa_pre_prompt(issues, "en", "ko")
+    assert "empty" in prompt
+    assert "action" in prompt.lower()
+
+
+def test_build_qa_post_prompt():
+    from pdf_translator.core.translator.base import build_qa_post_prompt
+    issues = [
+        {"page": 1, "expected_segments": 5, "extracted_text": "안녕",
+         "original_text": "Hello", "issues": ["only 2 of 5 found"]},
+    ]
+    prompt = build_qa_post_prompt(issues)
+    assert "verdict" in prompt.lower()
+
+
+def test_parse_qa_pre_response():
+    import json
+    from pdf_translator.core.translator.base import parse_qa_pre_response
+    response = json.dumps([
+        {"index": 0, "action": "revise", "text": "안녕하세요", "reason": "was empty"},
+    ])
+    result = parse_qa_pre_response(response)
+    assert result[0]["action"] == "revise"
+    assert result[0]["text"] == "안녕하세요"
+
+
+def test_parse_qa_post_response():
+    import json
+    from pdf_translator.core.translator.base import parse_qa_post_response
+    response = json.dumps([
+        {"page": 1, "verdict": "fail", "failed_indices": [2, 3], "reason": "missing"},
+    ])
+    result = parse_qa_post_response(response)
+    assert result[0]["verdict"] == "fail"
+    assert 2 in result[0]["failed_indices"]
+
+
 class FakeBackend:
     name = "fake"
     backend_type = "test"

@@ -186,8 +186,7 @@ def build_pdf(
     3. Merge each overlay onto its corresponding original page.
     4. Write the result with pypdf.
     """
-    reader = PdfReader(src_path)
-    writer = PdfWriter()
+    writer = PdfWriter(clone_from=src_path)
 
     # Register CJK font if available
     cjk_font_name = _register_cjk_font()
@@ -198,20 +197,17 @@ def build_pdf(
         if idx in translations:
             by_page.setdefault(el.page_number, []).append((idx, el))
 
-    num_pages = len(reader.pages)
-
-    for page_idx in range(num_pages):
+    for page_idx in range(len(writer.pages)):
         page_num = page_idx + 1
-        original_page = reader.pages[page_idx]
 
         if page_num not in by_page:
-            writer.add_page(original_page)
             continue
 
         items = by_page[page_num]
+        page = writer.pages[page_idx]
 
-        # Determine page dimensions from the original page
-        media_box = original_page.mediabox
+        # Determine page dimensions
+        media_box = page.mediabox
         page_width = float(media_box.width)
         page_height = float(media_box.height)
 
@@ -283,13 +279,11 @@ def build_pdf(
         c.showPage()
         c.save()
 
-        # Merge overlay onto original page
+        # Merge overlay onto the writer's page (already cloned)
         overlay_buf.seek(0)
         overlay_reader = PdfReader(overlay_buf)
         if overlay_reader.pages:
-            original_page.merge_page(overlay_reader.pages[0])
-
-        writer.add_page(original_page)
+            page.merge_page(overlay_reader.pages[0])
 
     with open(dst_path, "wb") as f:
         writer.write(f)

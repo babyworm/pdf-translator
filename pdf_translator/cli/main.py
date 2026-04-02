@@ -331,7 +331,7 @@ def run_compare(argv: list[str] | None = None):
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     args = parser.parse_args(argv)
 
-    from pdf_translator.core.compare import compare_backends, format_comparison_table, format_comparison_json
+    from pdf_translator.core.compare import compare_backends, format_comparison_json, format_comparison_table
 
     backends = args.backends.split(",") if args.backends else None
     glossary_dict = None

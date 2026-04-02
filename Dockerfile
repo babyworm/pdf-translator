@@ -32,4 +32,5 @@ EXPOSE 8000
 
 ENV PDF_TRANSLATOR_DATA_DIR=/data
 
-CMD ["python3", "-m", "pdf_translator.cli.main", "serve", "--host", "0.0.0.0", "--port", "8000", "--data-dir", "/data"]
+ENTRYPOINT ["python3", "-m", "pdf_translator.cli.main"]
+CMD ["serve", "--host", "0.0.0.0", "--port", "8000", "--data-dir", "/data"]

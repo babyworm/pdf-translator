@@ -1,6 +1,7 @@
 services:
   pdf-translator:
     build: .
+    image: ghcr.io/babyworm/pdf-translator:latest
     ports:
       - "8000:8000"
     volumes:
@@ -12,6 +13,19 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
     restart: unless-stopped
+
+  cli:
+    build: .
+    image: ghcr.io/babyworm/pdf-translator:latest
+    profiles: ["cli"]
+    volumes:
+      - ./:/data
+    working_dir: /data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
 
 volumes:
   pdf-data:

@@ -31,6 +31,18 @@ flowchart LR
 
 ## 설치
 
+### 원라인 설치 (권장)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/babyworm/pdf-translator/main/scripts/install.sh | bash
+```
+
+시스템 의존성(Java, 선택적 Tesseract)을 자동으로 설치합니다. macOS, Ubuntu, Fedora 지원.
+
+CI 환경: `curl ... | bash -s -- --no-interactive`
+
+### pip 설치
+
 ```bash
 git clone https://github.com/babyworm/pdf-translator.git
 cd pdf-translator
@@ -48,6 +60,28 @@ pip install -e ".[web]"
 
 # 전체 설치
 pip install -e ".[all]"
+```
+
+> **참고**: Java 11+가 필요합니다. `brew install openjdk@21` (macOS) 또는 `sudo apt install default-jdk` (Ubuntu)
+
+### Docker
+
+```bash
+# 웹 서버 모드
+docker compose up
+
+# CLI 모드 (현재 디렉토리의 PDF를 번역)
+docker run -v $(pwd):/data ghcr.io/babyworm/pdf-translator /data/input.pdf
+
+# docker compose CLI 프로필
+docker compose run --rm cli input.pdf --target-lang ko
+```
+
+### Homebrew (macOS)
+
+```bash
+brew tap babyworm/tap
+brew install pdf-translator
 ```
 
 ## CLI 사용법

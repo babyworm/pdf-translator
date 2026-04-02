@@ -3,10 +3,8 @@ from __future__ import annotations
 import csv
 import io
 import json
-import shutil
 import threading
 from pathlib import Path
-
 from typing import Literal
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect

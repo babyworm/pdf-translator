@@ -1,5 +1,11 @@
-from unittest.mock import patch, MagicMock
-from pdf_translator.core.compare import compare_backends, format_comparison_table, format_comparison_json, ComparisonResult
+from unittest.mock import MagicMock, patch
+
+from pdf_translator.core.compare import (
+    ComparisonResult,
+    compare_backends,
+    format_comparison_json,
+    format_comparison_table,
+)
 
 
 def test_comparison_result_creation():

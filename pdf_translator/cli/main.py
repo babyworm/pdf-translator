@@ -49,6 +49,10 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
                         help="Retranslate pending items in draft JSON")
     parser.add_argument("--ocr-engine", default="auto",
                         help="OCR engine (auto, surya, tesseract, none)")
+    parser.add_argument("--no-qa", action="store_true",
+                        help="Disable QA review (default: QA enabled)")
+    parser.add_argument("--qa-retries", type=int, default=2,
+                        help="Max QA retry attempts (default: 2)")
 
     args = parser.parse_args(argv)
     return TranslatorConfig(
@@ -66,6 +70,8 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
         build_from=args.build_from,
         retranslate=args.retranslate,
         ocr_engine=args.ocr_engine,
+        no_qa=args.no_qa,
+        qa_retries=args.qa_retries,
     )
 
 

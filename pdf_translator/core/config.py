@@ -23,3 +23,5 @@ class TranslatorConfig:
     build_from: str | None = None
     retranslate: str | None = None
     ocr_engine: str = "auto"
+    no_qa: bool = False
+    qa_retries: int = 2

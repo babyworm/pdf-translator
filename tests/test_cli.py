@@ -81,3 +81,19 @@ def test_parse_args_serve_not_crash():
     from pdf_translator.cli.main import parse_args
     cfg = parse_args(["test.pdf"])
     assert cfg.input_path == "test.pdf"
+
+
+def test_parse_args_qa_defaults():
+    cfg = parse_args(["input.pdf"])
+    assert cfg.no_qa is False
+    assert cfg.qa_retries == 2
+
+
+def test_parse_args_no_qa():
+    cfg = parse_args(["input.pdf", "--no-qa"])
+    assert cfg.no_qa is True
+
+
+def test_parse_args_qa_retries():
+    cfg = parse_args(["input.pdf", "--qa-retries", "3"])
+    assert cfg.qa_retries == 3

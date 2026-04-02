@@ -1,9 +1,57 @@
 from __future__ import annotations
 
 import json
+import platform
+import re
+import shutil
+import subprocess
+import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+
+_java_checked = False
+
+
+def _ensure_java(*, _force: bool = False) -> None:
+    """Check that Java 11+ is available. Exit with install hints if missing."""
+    global _java_checked
+    if _java_checked and not _force:
+        return
+    _java_checked = True
+
+    java_path = shutil.which("java")
+    if java_path is None:
+        os_name = platform.system()
+        hints = {
+            "Darwin": "  macOS:   brew install openjdk@21",
+            "Linux": "  Ubuntu:  sudo apt install default-jdk\n  Fedora:  sudo dnf install java-21-openjdk",
+        }
+        hint = hints.get(os_name, "  Install Java 11+ for your platform")
+        print(
+            f"\nError: Java 11+ is required but not found.\n\n"
+            f"Install Java:\n{hint}\n\n"
+            f"Then run 'pdf-translator check-deps' to verify.\n",
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    # Best-effort version check (warn only, don't block)
+    try:
+        result = subprocess.run(
+            ["java", "-version"], capture_output=True, text=True, timeout=5
+        )
+        version_output = result.stderr or result.stdout
+        match = re.search(r'"(\d+)', version_output)
+        if match:
+            major = int(match.group(1))
+            if major < 11:
+                print(
+                    f"Warning: Java {major} detected. Java 11+ is recommended.",
+                    file=sys.stderr,
+                )
+    except (subprocess.TimeoutExpired, OSError):
+        pass  # If we can't check version, java binary exists — proceed
 
 
 @dataclass
@@ -70,7 +118,7 @@ def _collect(node: dict, out: list[Element]) -> None:
 
 
 def extract_pdf(pdf_path: str, output_dir: str | None = None, pages: str | None = None, ocr_engine=None) -> list[Element]:
-    import shutil
+    _ensure_java()
 
     import opendataloader_pdf
 

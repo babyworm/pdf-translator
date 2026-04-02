@@ -1,5 +1,9 @@
+import subprocess
+from unittest.mock import patch
 
-from pdf_translator.core.extractor import Element, parse_elements
+import pytest
+
+from pdf_translator.core.extractor import Element, _ensure_java, parse_elements
 
 
 def test_element_creation():
@@ -48,3 +52,32 @@ def test_parse_elements_from_json():
     assert elements[0].type == "heading"
     assert elements[0].level == "h1"
     assert elements[1].content == "Body text here."
+
+
+def test_ensure_java_passes_when_java_found():
+    with patch("shutil.which", return_value="/usr/bin/java"):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=["java", "-version"], returncode=0,
+                stderr="openjdk version \"21.0.1\" 2023-10-17"
+            )
+            _ensure_java(_force=True)  # Should not raise
+
+
+def test_ensure_java_exits_when_java_missing():
+    with patch("shutil.which", return_value=None):
+        with pytest.raises(SystemExit) as exc_info:
+            _ensure_java(_force=True)
+        assert exc_info.value.code == 1
+
+
+def test_ensure_java_warns_old_version(capsys):
+    with patch("shutil.which", return_value="/usr/bin/java"):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = subprocess.CompletedProcess(
+                args=["java", "-version"], returncode=0,
+                stderr='java version "1.8.0_292"'
+            )
+            _ensure_java(_force=True)  # Should not exit, just warn
+            captured = capsys.readouterr()
+            assert "Warning" in captured.err

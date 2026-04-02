@@ -10,9 +10,12 @@ _MATH_PATTERN = re.compile(
 
 
 def is_math(text: str) -> bool:
-    """Detect if text is likely a mathematical formula."""
+    """Detect if text is likely a mathematical formula (not prose with math mentions)."""
     stripped = text.strip()
     if not stripped:
+        return False
+    # Long text is almost certainly prose, not a formula
+    if len(stripped) > 80:
         return False
     # Unicode math symbols (strong signal)
     symbol_count = len(_MATH_PATTERN.findall(stripped))
@@ -22,9 +25,8 @@ def is_math(text: str) -> bool:
     alpha_count = sum(1 for c in stripped if c.isalpha())
     if len(stripped) > 3 and alpha_count / len(stripped) < 0.3:
         return True
-    # Function/equation pattern: "Name(args) = ..." or "x = expression"
-    if "=" in stripped and "(" in stripped and len(stripped) < 120:
-        # Has both = and () — likely a formula definition
+    # Function/equation pattern: "Name(args) = ..." short formula definitions
+    if "=" in stripped and "(" in stripped and len(stripped) < 60:
         paren_count = stripped.count("(") + stripped.count(")")
         comma_count = stripped.count(",")
         if paren_count >= 2 and (comma_count >= 1 or symbol_count >= 1):

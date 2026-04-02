@@ -257,9 +257,12 @@ def build_pdf(
             if len(bbox) != 4:
                 continue
             x0, y_bottom, x1, y_top = bbox
-            # bbox is already in PDF-native coordinates (origin bottom-left)
             rect_width = x1 - x0
             rect_height = y_top - y_bottom
+
+            # Skip tiny elements (page numbers, footnote markers)
+            if rect_width < 10 and rect_height < 15:
+                continue
 
             if is_scanned:
                 # For scanned PDFs, use white background.
@@ -278,16 +281,26 @@ def build_pdf(
             if len(bbox) != 4:
                 continue
             x0, y_bottom, x1, y_top = bbox
+            rect_width = x1 - x0
+            rect_height = y_top - y_bottom
+
+            # Skip tiny elements (page numbers, footnote markers)
+            if rect_width < 10 and rect_height < 15:
+                continue
+
             translated = translations[idx]
             vertical = _is_vertical(bbox)
 
-            rect_width = x1 - x0
-            rect_height = y_top - y_bottom
-            # For vertical text, fit using swapped dimensions
-            if vertical:
+            # For headings, preserve original font size (don't shrink)
+            if el.type == "heading":
+                fontsize = el.font_size
+            elif vertical:
                 fontsize = _fit_fontsize(translated, rect_height, rect_width, el.font_size)
             else:
                 fontsize = _fit_fontsize(translated, rect_width, rect_height, el.font_size)
+
+            # Never go below 6px
+            fontsize = max(fontsize, 6.0)
 
             # Determine font
             font_name = "Helvetica"

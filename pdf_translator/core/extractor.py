@@ -160,35 +160,38 @@ def extract_pdf(pdf_path: str, output_dir: str | None = None, pages: str | None 
 
 def _ocr_fallback(pdf_path: str, ocr_engine, pages: str | None = None) -> list[Element]:
     """Extract text from PDF pages using OCR engine."""
-    import fitz
+    import pypdfium2 as pdfium
 
-    doc = fitz.open(pdf_path)
+    pdf = pdfium.PdfDocument(pdf_path)
     try:
         elements: list[Element] = []
-        page_range = _parse_pages(pages, len(doc)) if pages else range(len(doc))
+        page_count = len(pdf)
+        page_range = _parse_pages(pages, page_count) if pages else range(page_count)
 
         for page_idx in page_range:
-            if page_idx < 0 or page_idx >= len(doc):
+            if page_idx < 0 or page_idx >= page_count:
                 continue
-            page = doc[page_idx]
-            # Render page to PNG image
-            pixmap = page.get_pixmap(dpi=300)
-            img_bytes = pixmap.tobytes("png")
+            page = pdf[page_idx]
+            bitmap = page.render(scale=300 / 72)  # 300 DPI
+            pil_image = bitmap.to_pil()
+            import io
+            buf = io.BytesIO()
+            pil_image.save(buf, format="PNG")
+            img_bytes = buf.getvalue()
 
-            # Run OCR
             results = ocr_engine.extract(img_bytes, lang="en")
 
             for r in results:
                 elements.append(Element(
                     type="paragraph",
                     content=r.text,
-                    page_number=page_idx + 1,  # 1-indexed
+                    page_number=page_idx + 1,
                     bbox=r.bbox,
                     font_size=12.0,
                 ))
         return elements
     finally:
-        doc.close()
+        pdf.close()
 
 
 def _parse_pages(pages_str: str, total: int) -> list[int]:

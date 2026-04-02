@@ -69,6 +69,86 @@ Input:
 {json.dumps(items, ensure_ascii=False)}"""
 
 
+def build_prompt_with_layout(
+    items: list[dict],
+    source_lang: str,
+    target_lang: str,
+    glossary: dict[str, str] | None = None,
+) -> str:
+    """Build a translation prompt that includes bbox/type metadata.
+
+    Each item: {"index", "text", "type", "bbox_w", "bbox_h"}
+    LLM returns: [{"index", "action": "translate"|"skip", "text": "..."}]
+    """
+    src_name = LANG_NAMES.get(source_lang, source_lang)
+    tgt_name = LANG_NAMES.get(target_lang, target_lang)
+
+    glossary_section = ""
+    if glossary:
+        keep_terms = [k for k, v in glossary.items() if k.lower() == v.lower()]
+        translate_terms = [(k, v) for k, v in glossary.items() if k.lower() != v.lower()]
+        parts = []
+        if keep_terms:
+            parts.append(f"Keep these terms as-is (DO NOT translate): {', '.join(keep_terms)}")
+        if translate_terms:
+            mappings = ", ".join(f"{k} → {v}" for k, v in translate_terms)
+            parts.append(f"Use these translations: {mappings}")
+        glossary_section = "\n\nGLOSSARY RULES:\n" + "\n".join(f"- {p}" for p in parts)
+
+    return f"""You are a professional academic translator.
+Translate text from {src_name} to {tgt_name}. Each item has a text area size (bbox_w x bbox_h in points).
+
+RULES:
+- For each item, decide: "action": "translate" or "action": "skip".
+- Set action to "skip" for: mathematical formulas, equations, variable declarations, citation numbers, page numbers.
+- Set action to "translate" for: headings, paragraphs, captions, author info, footnotes.
+- When translating, be aware of the text area size. If the area is small, keep the translation concise.
+- Do NOT translate proper nouns, model names, or widely-known technical terms.
+- "Abstract" at the start of a paper → translate as the standard academic term (e.g., 초록 in Korean).
+- Preserve the original structure. Do not merge or split items.
+- Output ONLY a JSON array: [{{"index": N, "action": "translate"|"skip", "text": "..."}}]
+- For "skip" items, omit the "text" field.{glossary_section}
+
+Input:
+{json.dumps(items, ensure_ascii=False)}"""
+
+
+def parse_response_with_action(response: str, count: int) -> list[dict]:
+    """Parse LLM response with action field.
+
+    Returns list of {"action": "translate"|"skip", "text": str|None}.
+    Falls back gracefully if LLM returns old format (no action).
+    """
+    response = response.strip()
+    result = [{"action": "skip", "text": None}] * count
+
+    try:
+        fence_match = re.search(r"```(?:json)?\s*\n(.*?)```", response, re.DOTALL)
+        if fence_match:
+            response = fence_match.group(1).strip()
+
+        bracket_start = response.find("[")
+        bracket_end = response.rfind("]")
+        if bracket_start >= 0 and bracket_end > bracket_start:
+            response = response[bracket_start:bracket_end + 1]
+
+        data = json.loads(response)
+        if isinstance(data, list):
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                idx = item.get("index", -1)
+                if not (0 <= idx < count):
+                    continue
+                action = item.get("action", "translate")  # default to translate for backward compat
+                text = item.get("text")
+                result[idx] = {"action": action, "text": text}
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
+        logger.warning("Failed to parse layout response: %s", exc)
+
+    return result
+
+
 def parse_response(response: str, count: int) -> list[str | None]:
     response = response.strip()
     try:

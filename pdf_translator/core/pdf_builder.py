@@ -1,11 +1,15 @@
 # pdf_translator/core/pdf_builder.py
 from __future__ import annotations
 
+import io
 import logging
 import math
 from pathlib import Path
 
-import fitz
+from pypdf import PdfReader, PdfWriter
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
 from pdf_translator.core.extractor import Element
 
@@ -21,6 +25,9 @@ CJK_FONT_PATHS = [
     "/usr/share/fonts/truetype/unfonts-core/UnDotum.ttf",
     "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf",
 ]
+
+# Track whether the CJK font has already been registered with reportlab
+_cjk_font_registered: str | None = None
 
 
 def _find_cjk_font() -> str | None:
@@ -46,42 +53,47 @@ def _builtin_cjk_fontname(text: str) -> str:
     return "china-ss"
 
 
-def _sample_background_color(pixmap: fitz.Pixmap) -> tuple[float, float, float]:
-    samples = pixmap.samples
-    n = pixmap.n
-    pixel_count = pixmap.width * pixmap.height
-    if pixel_count == 0:
-        return (1.0, 1.0, 1.0)
-    # Sample every Nth pixel for performance (max 1000 samples)
-    step = max(1, pixel_count // 1000)
-    r_sum = g_sum = b_sum = 0
-    sampled = 0
-    if n < 3:
-        for i in range(0, len(samples), n * step):
-            r_sum += samples[i]
-            sampled += 1
-        gray = r_sum / (sampled * 255) if sampled else 1.0
-        return (gray, gray, gray)
-    for i in range(0, len(samples), n * step):
-        if i + 2 < len(samples):
-            r_sum += samples[i]
-            g_sum += samples[i + 1]
-            b_sum += samples[i + 2]
-            sampled += 1
-    if sampled == 0:
-        return (1.0, 1.0, 1.0)
-    return (r_sum / (sampled * 255), g_sum / (sampled * 255), b_sum / (sampled * 255))
+def _register_cjk_font() -> str | None:
+    """Try each CJK font path and register the first one that works.
+
+    Returns the registered font name, or ``None`` if no font could be loaded.
+    """
+    global _cjk_font_registered  # noqa: PLW0603
+    if _cjk_font_registered is not None:
+        return _cjk_font_registered
+
+    font_name = "CJK"
+    for font_path in CJK_FONT_PATHS:
+        if not Path(font_path).exists():
+            continue
+        try:
+            if font_path.endswith(".ttc"):
+                pdfmetrics.registerFont(
+                    TTFont(font_name, font_path, subfontIndex=0),
+                )
+            else:
+                pdfmetrics.registerFont(TTFont(font_name, font_path))
+            _cjk_font_registered = font_name
+            logger.debug("Registered CJK font: %s", font_path)
+            return font_name
+        except Exception:
+            logger.debug("Skipping incompatible font: %s", font_path)
+            continue
+
+    logger.warning("No compatible CJK font found")
+    return None
 
 
-def _fit_fontsize_v2(text: str, rect: fitz.Rect, max_size: float) -> float:
+def _fit_fontsize(text: str, width: float, height: float, max_size: float) -> float:
+    """Binary-search for the largest font size that fits *text* in width x height."""
     lo, hi = 4.0, max_size
     for _ in range(12):
         mid = (lo + hi) / 2
         estimated_width = sum(mid * (1.0 if _is_cjk(ch) else 0.6) for ch in text)
-        num_lines = math.ceil(estimated_width / rect.width) if rect.width > 0 else 1
+        num_lines = math.ceil(estimated_width / width) if width > 0 else 1
         estimated_height = num_lines * mid * 1.2
-        fits_width = estimated_width <= rect.width or num_lines > 1
-        fits_height = estimated_height <= rect.height
+        fits_width = estimated_width <= width or num_lines > 1
+        fits_height = estimated_height <= height
         if fits_width and fits_height:
             lo = mid
         else:
@@ -89,21 +101,72 @@ def _fit_fontsize_v2(text: str, rect: fitz.Rect, max_size: float) -> float:
     return lo
 
 
-def _build_html(text: str, fontsize: float, text_color: list[int], cjk_font: str | None) -> str:
-    r = text_color[0] if text_color else 0
-    g = text_color[1] if len(text_color) > 1 else 0
-    b = text_color[2] if len(text_color) > 2 else 0
-    font_family = "sans-serif"
-    if cjk_font:
-        font_family = f"CJK, {font_family}"
-    elif any(_is_cjk(ch) for ch in text):
-        font_family = f"{_builtin_cjk_fontname(text)}, {font_family}"
-    return (
-        f'<span style="font-size:{fontsize:.1f}px; '
-        f'color:rgb({r},{g},{b}); '
-        f'font-family:{font_family};">'
-        f'{text}</span>'
-    )
+def _wrap_text(text: str, fontsize: float, box_width: float) -> list[str]:
+    """Wrap *text* into lines that fit within *box_width* at *fontsize*.
+
+    Uses a simple character-width model: CJK chars are 1.0 * fontsize wide,
+    Latin chars are 0.6 * fontsize wide.
+    """
+    if box_width <= 0:
+        return [text]
+
+    lines: list[str] = []
+    current_line = ""
+    current_width = 0.0
+
+    for ch in text:
+        if ch == "\n":
+            lines.append(current_line)
+            current_line = ""
+            current_width = 0.0
+            continue
+        ch_width = fontsize * (1.0 if _is_cjk(ch) else 0.6)
+        if current_width + ch_width > box_width and current_line:
+            lines.append(current_line)
+            current_line = ch
+            current_width = ch_width
+        else:
+            current_line += ch
+            current_width += ch_width
+
+    if current_line:
+        lines.append(current_line)
+    return lines or [""]
+
+
+def _draw_text_in_rect(
+    c: canvas.Canvas,
+    text: str,
+    x0: float,
+    y0: float,
+    x1: float,
+    y1: float,
+    fontsize: float,
+    font_name: str,
+    text_color: tuple[float, float, float],
+) -> None:
+    """Draw *text* wrapped within the rectangle (x0, y0, x1, y1).
+
+    Coordinates are in PDF-native space (origin bottom-left, y up).
+    y1 > y0 (y1 is the top edge).
+    """
+    box_width = x1 - x0
+    line_height = fontsize * 1.2
+    lines = _wrap_text(text, fontsize, box_width)
+
+    c.setFillColorRGB(*text_color)
+    try:
+        c.setFont(font_name, fontsize)
+    except KeyError:
+        c.setFont("Helvetica", fontsize)
+
+    # Start drawing from top of box, descending
+    y_cursor = y1 - fontsize  # baseline of first line
+    for line in lines:
+        if y_cursor < y0:
+            break  # no more room
+        c.drawString(x0, y_cursor, line)
+        y_cursor -= line_height
 
 
 def build_pdf(
@@ -113,87 +176,120 @@ def build_pdf(
     translations: dict[int, str],
     is_scanned: bool = False,
 ) -> None:
-    doc = fitz.open(src_path)
-    try:
-        cjk_font = _find_cjk_font()
+    """Build a translated PDF by overlaying translated text onto the original.
 
-        by_page: dict[int, list[tuple[int, Element]]] = {}
-        for idx, el in enumerate(elements):
-            if idx in translations:
-                by_page.setdefault(el.page_number, []).append((idx, el))
+    Strategy:
+    1. Read the original PDF with pypdf.
+    2. For each page that has translations, create a reportlab overlay:
+       - Draw white (or background-color) rectangles to cover original text.
+       - Draw translated text with proper font, size, color, and wrapping.
+    3. Merge each overlay onto its corresponding original page.
+    4. Write the result with pypdf.
+    """
+    reader = PdfReader(src_path)
+    writer = PdfWriter()
 
-        for page_num, items in by_page.items():
-            if page_num < 1 or page_num > len(doc):
+    # Register CJK font if available
+    cjk_font_name = _register_cjk_font()
+
+    # Group translations by page number
+    by_page: dict[int, list[tuple[int, Element]]] = {}
+    for idx, el in enumerate(elements):
+        if idx in translations:
+            by_page.setdefault(el.page_number, []).append((idx, el))
+
+    num_pages = len(reader.pages)
+
+    for page_idx in range(num_pages):
+        page_num = page_idx + 1
+        original_page = reader.pages[page_idx]
+
+        if page_num not in by_page:
+            writer.add_page(original_page)
+            continue
+
+        items = by_page[page_num]
+
+        # Determine page dimensions from the original page
+        media_box = original_page.mediabox
+        page_width = float(media_box.width)
+        page_height = float(media_box.height)
+
+        # Create an in-memory overlay PDF with reportlab
+        overlay_buf = io.BytesIO()
+        c = canvas.Canvas(overlay_buf, pagesize=(page_width, page_height))
+
+        # --- Phase 1: Cover original text with filled rectangles ---
+        for idx, el in items:
+            bbox = el.bbox
+            if len(bbox) != 4:
                 continue
-            page = doc[page_num - 1]
-            page_height = page.rect.height
+            x0, y_bottom, x1, y_top = bbox
+            # bbox is already in PDF-native coordinates (origin bottom-left)
+            rect_width = x1 - x0
+            rect_height = y_top - y_bottom
 
             if is_scanned:
-                for idx, el in items:
-                    bbox = el.bbox
-                    if len(bbox) != 4:
-                        continue
-                    x0, y_bottom, x1, y_top = bbox
-                    rect = fitz.Rect(x0, page_height - y_top, x1, page_height - y_bottom)
-                    pixmap = page.get_pixmap(clip=rect)
-                    bg_color = _sample_background_color(pixmap)
-                    shape = page.new_shape()
-                    shape.draw_rect(rect)
-                    shape.finish(fill=bg_color)
-                    shape.commit()
+                # For scanned PDFs, use white background.
+                # (The original fitz code sampled background color from the
+                # pixmap, but white is a safe default for scanned documents.)
+                c.setFillColorRGB(1.0, 1.0, 1.0)
             else:
-                for idx, el in items:
-                    bbox = el.bbox
-                    if len(bbox) != 4:
-                        continue
-                    x0, y_bottom, x1, y_top = bbox
-                    rect = fitz.Rect(x0, page_height - y_top, x1, page_height - y_bottom)
-                    page.add_redact_annot(rect, fill=(1, 1, 1))
-                page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+                # For regular PDFs, white-out the original text area
+                c.setFillColorRGB(1.0, 1.0, 1.0)
 
-            for idx, el in items:
-                bbox = el.bbox
-                if len(bbox) != 4:
-                    continue
-                x0, y_bottom, x1, y_top = bbox
-                rect = fitz.Rect(x0, page_height - y_top, x1, page_height - y_bottom)
-                translated = translations[idx]
-                fontsize = _fit_fontsize_v2(translated, rect, el.font_size)
+            c.rect(x0, y_bottom, rect_width, rect_height, stroke=0, fill=1)
 
-                inserted = False
-                try:
-                    html = _build_html(translated, fontsize, el.text_color, cjk_font)
-                    rc = page.insert_htmlbox(rect, html)
-                    if rc >= 0:
-                        inserted = True
-                except Exception:
-                    pass
+        # --- Phase 2: Draw translated text ---
+        for idx, el in items:
+            bbox = el.bbox
+            if len(bbox) != 4:
+                continue
+            x0, y_bottom, x1, y_top = bbox
+            translated = translations[idx]
 
-                if not inserted:
-                    try:
-                        kwargs = {"fontsize": fontsize}
-                        if cjk_font:
-                            kwargs["fontfile"] = cjk_font
-                            kwargs["fontname"] = "CJK"
-                        elif any(_is_cjk(ch) for ch in translated):
-                            kwargs["fontname"] = _builtin_cjk_fontname(translated)
-                        color_floats = tuple(c / 255 for c in el.text_color[:3]) if el.text_color else (0, 0, 0)
-                        kwargs["color"] = color_floats
-                        rc = page.insert_textbox(rect, translated, **kwargs)
-                        if rc >= 0:
-                            inserted = True
-                    except Exception:
-                        pass
+            rect_width = x1 - x0
+            rect_height = y_top - y_bottom
+            fontsize = _fit_fontsize(translated, rect_width, rect_height, el.font_size)
 
-                if not inserted:
-                    try:
-                        page.insert_text(
-                            rect.tl + fitz.Point(0, fontsize),
-                            translated, fontsize=fontsize,
-                        )
-                    except Exception:
-                        logger.warning("Failed to insert text at page %d, idx %d", page_num, idx)
+            # Determine font
+            font_name = "Helvetica"
+            has_cjk = any(_is_cjk(ch) for ch in translated)
+            if cjk_font_name and has_cjk:
+                font_name = cjk_font_name
+            # If no external CJK font registered, Helvetica is used as fallback.
+            # reportlab doesn't have built-in CJK by font name like fitz did,
+            # so we rely on the registered TTFont.
 
-        doc.save(dst_path)
-    finally:
-        doc.close()
+            # Determine text color
+            text_color = (0.0, 0.0, 0.0)
+            if el.text_color and len(el.text_color) >= 3:
+                text_color = (
+                    el.text_color[0] / 255.0,
+                    el.text_color[1] / 255.0,
+                    el.text_color[2] / 255.0,
+                )
+
+            try:
+                _draw_text_in_rect(
+                    c, translated, x0, y_bottom, x1, y_top,
+                    fontsize, font_name, text_color,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to insert text at page %d, idx %d", page_num, idx,
+                )
+
+        c.showPage()
+        c.save()
+
+        # Merge overlay onto original page
+        overlay_buf.seek(0)
+        overlay_reader = PdfReader(overlay_buf)
+        if overlay_reader.pages:
+            original_page.merge_page(overlay_reader.pages[0])
+
+        writer.add_page(original_page)
+
+    with open(dst_path, "wb") as f:
+        writer.write(f)

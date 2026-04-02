@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+from pypdf import PdfReader
+
 from pdf_translator.core.extractor import Element
 
 logger = logging.getLogger(__name__)
@@ -68,6 +70,75 @@ def detect_pre_build_issues(
                 "index": i, "original": original, "translated": translated,
                 "type": el.type, "bbox_w": round(bbox_w, 1), "bbox_h": round(bbox_h, 1),
                 "issue": "heading overflow — translation exceeds 150% of bbox width",
+            })
+
+    return issues
+
+
+def detect_post_build_issues(
+    src_pdf: str,
+    built_pdf: str,
+    elements: list[Element],
+    translations: dict[int, str],
+) -> list[dict]:
+    """Detect issues in the built PDF by re-extracting text. No LLM calls."""
+    issues = []
+
+    try:
+        reader = PdfReader(built_pdf)
+    except Exception as e:
+        logger.warning("Cannot read built PDF for QA: %s", e)
+        return issues
+
+    # Group expected translations by page
+    by_page: dict[int, list[tuple[int, str, str]]] = {}
+    for i, el in enumerate(elements):
+        if i in translations:
+            by_page.setdefault(el.page_number, []).append(
+                (i, el.content, translations[i])
+            )
+
+    for page_num, expected in by_page.items():
+        page_idx = page_num - 1
+        if page_idx < 0 or page_idx >= len(reader.pages):
+            issues.append({
+                "page": page_num,
+                "expected_segments": len(expected),
+                "extracted_text": "",
+                "original_text": "",
+                "issues": [f"page {page_num} not found in built PDF"],
+            })
+            continue
+
+        extracted = reader.pages[page_idx].extract_text() or ""
+
+        page_issues = []
+
+        # Check if expected translated segments appear
+        found = sum(1 for _, _, trans in expected if trans[:10] in extracted)
+        if found < len(expected) * 0.5:
+            page_issues.append(
+                f"only {found} of {len(expected)} segments found in extracted text"
+            )
+
+        # Check if original text still visible
+        original_found = sum(
+            1 for _, orig, _ in expected
+            if len(orig) > 10 and orig[:15] in extracted
+        )
+        if original_found > 0:
+            page_issues.append(
+                f"{original_found} original text segments still visible"
+            )
+
+        if page_issues:
+            originals = " | ".join(orig[:30] for _, orig, _ in expected[:3])
+            issues.append({
+                "page": page_num,
+                "expected_segments": len(expected),
+                "extracted_text": extracted[:500],
+                "original_text": originals,
+                "issues": page_issues,
             })
 
     return issues

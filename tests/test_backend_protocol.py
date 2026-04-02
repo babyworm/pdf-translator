@@ -67,6 +67,7 @@ def test_build_prompt_with_layout_formula():
 
 def test_parse_response_with_action():
     import json
+
     from pdf_translator.core.translator.base import parse_response_with_action
     response = json.dumps([
         {"index": 0, "action": "translate", "text": "초록"},
@@ -82,6 +83,7 @@ def test_parse_response_with_action():
 def test_parse_response_with_action_fallback():
     """If LLM returns old format (no action), treat all as translate."""
     import json
+
     from pdf_translator.core.translator.base import parse_response_with_action
     response = json.dumps([
         {"index": 0, "text": "초록"},
@@ -115,6 +117,7 @@ def test_build_qa_post_prompt():
 
 def test_parse_qa_pre_response():
     import json
+
     from pdf_translator.core.translator.base import parse_qa_pre_response
     response = json.dumps([
         {"index": 0, "action": "revise", "text": "안녕하세요", "reason": "was empty"},
@@ -126,6 +129,7 @@ def test_parse_qa_pre_response():
 
 def test_parse_qa_post_response():
     import json
+
     from pdf_translator.core.translator.base import parse_qa_post_response
     response = json.dumps([
         {"page": 1, "verdict": "fail", "failed_indices": [2, 3], "reason": "missing"},

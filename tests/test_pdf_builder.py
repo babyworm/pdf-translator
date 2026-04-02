@@ -1,7 +1,6 @@
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 from pypdf import PdfReader
 from reportlab.pdfgen import canvas

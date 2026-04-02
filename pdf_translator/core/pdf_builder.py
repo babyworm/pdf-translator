@@ -16,10 +16,14 @@ from pdf_translator.core.extractor import Element
 logger = logging.getLogger(__name__)
 
 CJK_FONT_PATHS = [
-    "/System/Library/Fonts/AppleSDGothicNeo.ttc",
-    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+    # Noto Sans CJK — preferred
+    Path.home() / "Library/Fonts/NotoSansCJKkr-Regular.otf",  # macOS brew cask
     "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+    # Fallbacks
+    "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+    "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
     "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
     "/usr/share/fonts/truetype/baekmuk/batang.ttf",
     "/usr/share/fonts/truetype/unfonts-core/UnDotum.ttf",
@@ -33,8 +37,17 @@ _cjk_font_registered: str | None = None
 def _find_cjk_font() -> str | None:
     for p in CJK_FONT_PATHS:
         if Path(p).exists():
-            return p
+            return str(p)
     return None
+
+
+def _is_vertical(bbox: list[float]) -> bool:
+    """Detect if a bbox represents vertically-oriented text."""
+    if len(bbox) != 4:
+        return False
+    w = bbox[2] - bbox[0]
+    h = bbox[3] - bbox[1]
+    return h > 0 and w > 0 and h / w > 3.0
 
 
 def _is_cjk(ch: str) -> bool:
@@ -144,29 +157,52 @@ def _draw_text_in_rect(
     fontsize: float,
     font_name: str,
     text_color: tuple[float, float, float],
+    vertical: bool = False,
 ) -> None:
     """Draw *text* wrapped within the rectangle (x0, y0, x1, y1).
 
     Coordinates are in PDF-native space (origin bottom-left, y up).
     y1 > y0 (y1 is the top edge).
+    If *vertical* is True, text is drawn rotated 90° counter-clockwise.
     """
-    box_width = x1 - x0
-    line_height = fontsize * 1.2
-    lines = _wrap_text(text, fontsize, box_width)
-
     c.setFillColorRGB(*text_color)
     try:
         c.setFont(font_name, fontsize)
     except KeyError:
         c.setFont("Helvetica", fontsize)
 
-    # Start drawing from top of box, descending
-    y_cursor = y1 - fontsize  # baseline of first line
-    for line in lines:
-        if y_cursor < y0:
-            break  # no more room
-        c.drawString(x0, y_cursor, line)
-        y_cursor -= line_height
+    if vertical:
+        # Rotate: use the height as the "writing width" and width as "writing height"
+        box_width = y1 - y0  # long axis becomes writing direction
+        box_height = x1 - x0
+        line_height = fontsize * 1.2
+        lines = _wrap_text(text, fontsize, box_width)
+
+        c.saveState()
+        # Translate to bottom-left of rect, then rotate 90° CCW
+        c.translate(x0, y0)
+        c.rotate(90)
+        # After rotation: origin is at (x0, y0), x-axis points up, y-axis points left
+        # Drawing space: (0, 0) to (box_width, -box_height)
+        y_cursor = -fontsize
+        for line in lines:
+            if abs(y_cursor) > box_height:
+                break
+            c.drawString(0, y_cursor, line)
+            y_cursor -= line_height
+        c.restoreState()
+    else:
+        box_width = x1 - x0
+        line_height = fontsize * 1.2
+        lines = _wrap_text(text, fontsize, box_width)
+
+        # Start drawing from top of box, descending
+        y_cursor = y1 - fontsize  # baseline of first line
+        for line in lines:
+            if y_cursor < y0:
+                break  # no more room
+            c.drawString(x0, y_cursor, line)
+            y_cursor -= line_height
 
 
 def build_pdf(
@@ -243,10 +279,15 @@ def build_pdf(
                 continue
             x0, y_bottom, x1, y_top = bbox
             translated = translations[idx]
+            vertical = _is_vertical(bbox)
 
             rect_width = x1 - x0
             rect_height = y_top - y_bottom
-            fontsize = _fit_fontsize(translated, rect_width, rect_height, el.font_size)
+            # For vertical text, fit using swapped dimensions
+            if vertical:
+                fontsize = _fit_fontsize(translated, rect_height, rect_width, el.font_size)
+            else:
+                fontsize = _fit_fontsize(translated, rect_width, rect_height, el.font_size)
 
             # Determine font
             font_name = "Helvetica"
@@ -260,16 +301,19 @@ def build_pdf(
             # Determine text color
             text_color = (0.0, 0.0, 0.0)
             if el.text_color and len(el.text_color) >= 3:
-                text_color = (
-                    el.text_color[0] / 255.0,
-                    el.text_color[1] / 255.0,
-                    el.text_color[2] / 255.0,
-                )
+                try:
+                    text_color = (
+                        float(el.text_color[0]) / 255.0,
+                        float(el.text_color[1]) / 255.0,
+                        float(el.text_color[2]) / 255.0,
+                    )
+                except (ValueError, TypeError):
+                    pass
 
             try:
                 _draw_text_in_rect(
                     c, translated, x0, y_bottom, x1, y_top,
-                    fontsize, font_name, text_color,
+                    fontsize, font_name, text_color, vertical=vertical,
                 )
             except Exception:
                 logger.warning(

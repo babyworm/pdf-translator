@@ -28,6 +28,10 @@ class ClaudeCLIBackend:
             return parse_response(response, count=len(texts))
         return [None] * len(texts)
 
+    def translate_raw(self, prompt: str, count: int) -> str | None:
+        """Send a pre-built prompt and return the raw response."""
+        return self._run_cli(prompt)
+
     def _run_cli(self, prompt: str) -> str:
         for attempt in range(self.max_retries + 1):
             try:

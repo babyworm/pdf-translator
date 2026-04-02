@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import math
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
@@ -11,9 +15,116 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
+from pdf_translator.core.chunker import is_math
 from pdf_translator.core.extractor import Element
 
 logger = logging.getLogger(__name__)
+
+_JAVA_DIR = Path(__file__).resolve().parent.parent / "java"
+_JAVA_CLASS = "PdfBuilder"
+
+
+def _java_available() -> bool:
+    """Check if Java + compiled PdfBuilder class are available."""
+    if not shutil.which("java"):
+        return False
+    class_file = _JAVA_DIR / f"{_JAVA_CLASS}.class"
+    if class_file.exists():
+        return True
+    # Try to compile
+    return _ensure_compiled()
+
+
+def _ensure_compiled() -> bool:
+    """Compile PdfBuilder.java if .class is missing. Returns True on success."""
+    java_src = _JAVA_DIR / f"{_JAVA_CLASS}.java"
+    if not java_src.exists():
+        return False
+    jar = _find_opendataloader_jar()
+    if not jar:
+        return False
+    javac = shutil.which("javac")
+    if not javac:
+        return False
+    try:
+        subprocess.run(
+            [javac, "-cp", str(jar), "-d", str(_JAVA_DIR), str(java_src)],
+            capture_output=True, timeout=30,
+        )
+        return (_JAVA_DIR / f"{_JAVA_CLASS}.class").exists()
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def _find_opendataloader_jar() -> Path | None:
+    """Locate the opendataloader-pdf JAR (contains PDFBox + Jackson)."""
+    try:
+        import opendataloader_pdf
+        jar = Path(opendataloader_pdf.__file__).parent / "jar" / "opendataloader-pdf-cli.jar"
+        if jar.exists():
+            return jar
+    except ImportError:
+        pass
+    return None
+
+
+def _build_translations_json(
+    elements: list[Element],
+    translations: dict[int, str],
+    json_path: str,
+) -> None:
+    """Build the translations JSON file for the Java PdfBuilder."""
+    items = []
+    for i, el in enumerate(elements):
+        if not el.content.strip():
+            continue
+        if is_math(el.content):
+            items.append({
+                "page": el.page_number, "bbox": el.bbox,
+                "text": el.content, "original": el.content,
+                "font_size": el.font_size, "text_color": el.text_color,
+                "type": el.type, "skip": True,
+            })
+        elif i in translations:
+            items.append({
+                "page": el.page_number, "bbox": el.bbox,
+                "text": translations[i], "original": el.content,
+                "font_size": el.font_size, "text_color": el.text_color,
+                "type": el.type, "skip": False,
+            })
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False)
+
+
+def _build_pdf_pdfbox(
+    src_path: str,
+    dst_path: str,
+    elements: list[Element],
+    translations: dict[int, str],
+) -> bool:
+    """Build PDF using the Java PDFBox backend. Returns True on success."""
+    jar = _find_opendataloader_jar()
+    if not jar:
+        return False
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as f:
+        json_path = f.name
+    try:
+        _build_translations_json(elements, translations, json_path)
+        cmd = [
+            "java", "-cp", f"{jar}:{_JAVA_DIR}",
+            _JAVA_CLASS, src_path, json_path, dst_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0 and "OK" in result.stdout:
+            return True
+        logger.warning("Java PdfBuilder failed: %s", result.stderr[-300:] if result.stderr else "")
+        return False
+    except (subprocess.TimeoutExpired, OSError) as e:
+        logger.warning("Java PdfBuilder error: %s", e)
+        return False
+    finally:
+        Path(json_path).unlink(missing_ok=True)
+
 
 CJK_FONT_PATHS = [
     # Noto Sans CJK — preferred
@@ -212,7 +323,26 @@ def build_pdf(
     translations: dict[int, str],
     is_scanned: bool = False,
 ) -> None:
-    """Build a translated PDF by overlaying translated text onto the original.
+    """Build a translated PDF.
+
+    Tries Java PDFBox backend first (higher quality), falls back to
+    pypdf+reportlab if Java is unavailable.
+    """
+    if _java_available():
+        if _build_pdf_pdfbox(src_path, dst_path, elements, translations):
+            return
+        logger.warning("Java PDFBox failed, falling back to reportlab")
+    _build_pdf_reportlab(src_path, dst_path, elements, translations, is_scanned)
+
+
+def _build_pdf_reportlab(
+    src_path: str,
+    dst_path: str,
+    elements: list[Element],
+    translations: dict[int, str],
+    is_scanned: bool = False,
+) -> None:
+    """Fallback: build PDF with pypdf+reportlab overlay approach.
 
     Strategy:
     1. Read the original PDF with pypdf.

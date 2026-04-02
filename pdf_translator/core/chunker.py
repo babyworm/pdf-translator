@@ -4,9 +4,10 @@ import re
 
 from pdf_translator.core.extractor import Element
 
-_MATH_PATTERN = re.compile(
-    r"[=∑∫∏∂∇±×÷√∞≈≠≤≥∈∉⊂⊃∀∃∧∨¬⟨⟩‖αβγδεζηθλμσφψω]"
-)
+# Symbols that need 2+ occurrences to signal math
+_MATH_WEAK = re.compile(r"[=±×÷⟨⟩‖]")
+# Symbols where even 1 occurrence strongly signals math
+_MATH_STRONG = re.compile(r"[∑∫∏∂∇√∞≈≠≤≥∈∉⊂⊃∀∃∧∨¬αβγδεζηθλμσφψω]")
 
 
 def is_math(text: str) -> bool:
@@ -17,9 +18,12 @@ def is_math(text: str) -> bool:
     # Long text is almost certainly prose, not a formula
     if len(stripped) > 80:
         return False
-    # Unicode math symbols (strong signal)
-    symbol_count = len(_MATH_PATTERN.findall(stripped))
-    if symbol_count >= 2:
+    # Strong math symbols — 1 is enough for short text
+    if _MATH_STRONG.search(stripped):
+        return True
+    # Weak math symbols — need 2+
+    weak_count = len(_MATH_WEAK.findall(stripped))
+    if weak_count >= 2:
         return True
     # Mostly non-letter characters (numbers, operators, parens)
     alpha_count = sum(1 for c in stripped if c.isalpha())
@@ -29,7 +33,7 @@ def is_math(text: str) -> bool:
     if "=" in stripped and "(" in stripped and len(stripped) < 60:
         paren_count = stripped.count("(") + stripped.count(")")
         comma_count = stripped.count(",")
-        if paren_count >= 2 and (comma_count >= 1 or symbol_count >= 1):
+        if paren_count >= 2 and (comma_count >= 1 or weak_count >= 1):
             return True
     return False
 

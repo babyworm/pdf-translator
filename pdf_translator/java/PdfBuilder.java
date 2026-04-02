@@ -248,7 +248,7 @@ public class PdfBuilder {
         List<String> lines = wrapText(text, fontSize, boxWidth, font);
         float yCursor = y1 - fontSize;
         for (String line : lines) {
-            if (yCursor < y0) break;
+            // Allow vertical overflow — content completeness over layout precision
             drawLine(cs, line, x0, yCursor, fontSize, font);
             yCursor -= lineHeight;
         }
@@ -350,7 +350,7 @@ public class PdfBuilder {
     }
 
     private static float fitFontSize(String text, float width, float height, float maxSize, PDFont font) {
-        float lo = 4f, hi = maxSize;
+        float lo = Math.max(maxSize * 0.6f, 6f), hi = maxSize;
         for (int i = 0; i < 12; i++) {
             float mid = (lo + hi) / 2f;
             float totalW = measureText(text, font, mid);

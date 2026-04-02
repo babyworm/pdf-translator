@@ -53,12 +53,17 @@ def build_prompt(
             parts.append(f"Use these translations: {mappings}")
         glossary_section = "\n\nGLOSSARY RULES:\n" + "\n".join(f"- {p}" for p in parts)
 
-    return f"""You are a professional translator.
+    return f"""You are a professional academic translator.
 Translate the following text from {src_name} to {tgt_name}.
-Preserve the original structure and formatting.
-Input is a JSON array of indexed items.
-Output ONLY a JSON array in the same order with translated text.
-Do not merge or split items. Keep untranslatable terms as-is.{glossary_section}
+
+RULES:
+- Preserve the original structure and formatting.
+- Do NOT translate mathematical formulas, equations, or variable names.
+- Do NOT translate proper nouns, model names, or widely-known technical terms (e.g., Transformer, Attention, BLEU, LSTM).
+- "Abstract" at the start of an academic paper should be translated as the standard academic term (e.g., 초록 in Korean).
+- Input is a JSON array of indexed items.
+- Output ONLY a JSON array in the same order with translated text.
+- Do not merge or split items.{glossary_section}
 
 Input:
 {json.dumps(items, ensure_ascii=False)}"""

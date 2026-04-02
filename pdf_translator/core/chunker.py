@@ -1,6 +1,35 @@
 from __future__ import annotations
 
+import re
+
 from pdf_translator.core.extractor import Element
+
+_MATH_PATTERN = re.compile(
+    r"[=∑∫∏∂∇±×÷√∞≈≠≤≥∈∉⊂⊃∀∃∧∨¬⟨⟩‖αβγδεζηθλμσφψω]"
+)
+
+
+def is_math(text: str) -> bool:
+    """Detect if text is likely a mathematical formula."""
+    stripped = text.strip()
+    if not stripped:
+        return False
+    # Unicode math symbols (strong signal)
+    symbol_count = len(_MATH_PATTERN.findall(stripped))
+    if symbol_count >= 2:
+        return True
+    # Mostly non-letter characters (numbers, operators, parens)
+    alpha_count = sum(1 for c in stripped if c.isalpha())
+    if len(stripped) > 3 and alpha_count / len(stripped) < 0.3:
+        return True
+    # Function/equation pattern: "Name(args) = ..." or "x = expression"
+    if "=" in stripped and "(" in stripped and len(stripped) < 120:
+        # Has both = and () — likely a formula definition
+        paren_count = stripped.count("(") + stripped.count(")")
+        comma_count = stripped.count(",")
+        if paren_count >= 2 and (comma_count >= 1 or symbol_count >= 1):
+            return True
+    return False
 
 
 def build_batches(
@@ -8,7 +37,7 @@ def build_batches(
     max_segments: int = 40,
     max_chars: int = 4500,
 ) -> list[list[Element]]:
-    valid = [e for e in elements if e.content.strip()]
+    valid = [e for e in elements if e.content.strip() and not is_math(e.content)]
     if not valid:
         return []
 

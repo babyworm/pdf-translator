@@ -13,9 +13,16 @@ SGD,SGD,keep
 ReLU,ReLU,keep
 softmax,softmax,keep
 dropout,dropout,keep
-fine-tuning,파인튜닝,translate
+BLEU,BLEU,keep
+WMT,WMT,keep
+attention,attention,keep
+self-attention,self-attention,keep
+multi-head attention,multi-head attention,keep
 transformer,transformer,keep
-attention mechanism,어텐션 메커니즘,translate
+encoder,encoder,keep
+decoder,decoder,keep
+fine-tuning,파인튜닝,translate
+attention mechanism,attention 메커니즘,translate
 backpropagation,역전파,translate
 epoch,에폭,translate
 batch size,배치 크기,translate
@@ -26,3 +33,10 @@ embedding,임베딩,translate
 tokenizer,토크나이저,translate
 inference,추론,translate
 pre-training,사전 학습,translate
+Abstract,초록,translate
+Introduction,서론,translate
+Conclusion,결론,translate
+Related Work,관련 연구,translate
+Acknowledgments,감사의 글,translate
+References,참고문헌,translate
+Appendix,부록,translate

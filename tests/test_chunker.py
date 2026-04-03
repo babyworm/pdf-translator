@@ -11,22 +11,67 @@ def _el(content: str, page: int = 1) -> Element:
     )
 
 def test_single_batch():
-    elements = [_el("Hello"), _el("World")]
+    elements = [_el("Hello world."), _el("Goodbye world.")]
     batches = build_batches(elements)
     assert len(batches) == 1
     assert len(batches[0]) == 2
 
 
 def test_split_by_count():
-    elements = [_el(f"item {i}") for i in range(50)]
+    elements = [_el(f"Item {i} is here.") for i in range(50)]
     batches = build_batches(elements, max_segments=40)
     assert len(batches) == 2
     assert len(batches[0]) == 40
     assert len(batches[1]) == 10
 
 
+def test_merge_split_sentences():
+    """Elements without sentence-ending punctuation are merged."""
+    elements = [_el("This is the first half"), _el("of the sentence.")]
+    batches = build_batches(elements)
+    texts = [e.content for batch in batches for e in batch]
+    assert len(texts) == 1
+    assert texts[0] == "This is the first half of the sentence."
+
+
+def test_no_merge_complete_sentences():
+    """Complete sentences stay separate."""
+    elements = [_el("First sentence."), _el("Second sentence.")]
+    batches = build_batches(elements)
+    texts = [e.content for batch in batches for e in batch]
+    assert len(texts) == 2
+
+
+def test_merge_skips_over_license():
+    """Sentence fragments are reconnected across license-like elements."""
+    elements = [
+        _el("This is a sentence"),
+        _el("Copyright 2024 Some Corp"),
+        _el("that continues here."),
+    ]
+    batches = build_batches(elements)
+    texts = [e.content for batch in batches for e in batch]
+    # Fragments should be merged, skipping the license element
+    assert "This is a sentence that continues here." in texts
+    # License element is preserved separately (but filtered by build_batches
+    # only if it has content — it does, so it appears)
+    assert any("Copyright" in t for t in texts)
+
+
+def test_merge_skips_over_math():
+    """Sentence fragments are reconnected across math elements."""
+    elements = [
+        _el("We define the function"),
+        _el("FFN(x) = max(0,xW1 + b1)W2 + b2"),
+        _el("for all input vectors."),
+    ]
+    batches = build_batches(elements)
+    texts = [e.content for batch in batches for e in batch]
+    assert "We define the function for all input vectors." in texts
+
+
 def test_split_by_chars():
-    elements = [_el("a" * 2000) for _ in range(5)]
+    elements = [_el("a" * 1999 + ".") for _ in range(5)]
     batches = build_batches(elements, max_chars=4500)
     assert len(batches) >= 3
 
@@ -83,12 +128,12 @@ class TestIsMath:
     def test_skips_math_in_batches(self):
         """Math elements should be excluded from translation batches."""
         elements = [
-            _el("Normal text to translate"),
+            _el("Normal text to translate."),
             _el("FFN(x) = max(0,xW1 + b1)W2 + b2"),
-            _el("Another normal paragraph"),
+            _el("Another normal paragraph."),
         ]
         batches = build_batches(elements)
         all_texts = [e.content for batch in batches for e in batch]
-        assert "Normal text to translate" in all_texts
-        assert "Another normal paragraph" in all_texts
+        assert "Normal text to translate." in all_texts
+        assert "Another normal paragraph." in all_texts
         assert "FFN(x) = max(0,xW1 + b1)W2 + b2" not in all_texts

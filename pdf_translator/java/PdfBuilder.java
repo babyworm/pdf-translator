@@ -327,6 +327,12 @@ public class PdfBuilder {
         return total;
     }
 
+    // Kinsoku (금칙) — characters prohibited at line start
+    private static final String KINSOKU_START =
+        "）、。，．：；？！」』】〉》〕）｝,.;:?!)]}…‥·ー々ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ";
+    // Kinsoku — characters prohibited at line end
+    private static final String KINSOKU_END = "（「『【〈《〔（｛([{";
+
     private static List<String> wrapText(String text, float fontSize, float boxWidth, PDFont font) {
         List<String> lines = new ArrayList<>();
         if (boxWidth <= 0) { lines.add(text); return lines; }
@@ -341,6 +347,12 @@ public class PdfBuilder {
                 cw = f.getStringWidth(String.valueOf(ch)) / 1000f * fontSize;
             } catch (Exception e) { cw = fontSize * 0.6f; }
             if (curW + cw > boxWidth && cur.length() > 0) {
+                // Kinsoku: don't break if current char would start the next line improperly
+                if (KINSOKU_START.indexOf(ch) >= 0) { cur.append(ch); curW += cw; continue; }
+                // Kinsoku: don't leave line-end prohibited char at end of line
+                if (cur.length() > 0 && KINSOKU_END.indexOf(cur.charAt(cur.length() - 1)) >= 0) {
+                    cur.append(ch); curW += cw; continue;
+                }
                 lines.add(cur.toString()); cur = new StringBuilder(); curW = 0;
             }
             cur.append(ch); curW += cw;

@@ -57,10 +57,12 @@ def build_prompt(
 Translate the following text from {src_name} to {tgt_name}.
 
 RULES:
-- Preserve the original structure and formatting.
+- Translate ALL prose text thoroughly. Do not leave sentences or phrases untranslated.
+- Translate general technical terms into the target language (e.g., "method" → "방법", "result" → "결과", "performance" → "성능").
+- Only keep these in the original language: proper nouns, model names, dataset names, and widely-known abbreviations (e.g., Transformer, BLEU, LSTM, ImageNet).
 - Do NOT translate mathematical formulas, equations, or variable names.
-- Do NOT translate proper nouns, model names, or widely-known technical terms (e.g., Transformer, Attention, BLEU, LSTM).
 - "Abstract" at the start of an academic paper should be translated as the standard academic term (e.g., 초록 in Korean).
+- Preserve the original structure and formatting.
 - Input is a JSON array of indexed items.
 - Output ONLY a JSON array in the same order with translated text.
 - Do not merge or split items.{glossary_section}
@@ -102,8 +104,10 @@ RULES:
 - For each item, decide: "action": "translate" or "action": "skip".
 - Set action to "skip" for: mathematical formulas, equations, variable declarations, citation numbers, page numbers.
 - Set action to "translate" for: headings, paragraphs, captions, author info, footnotes.
+- Translate ALL prose text thoroughly. Do not leave sentences or phrases untranslated.
+- Translate general technical terms into the target language (e.g., "method" → "방법", "result" → "결과", "performance" → "성능").
+- Only keep in original language: proper nouns, model names, dataset names, and widely-known abbreviations (e.g., Transformer, BLEU, LSTM, ImageNet).
 - When translating, be aware of the text area size. If the area is small, keep the translation concise.
-- Do NOT translate proper nouns, model names, or widely-known technical terms.
 - "Abstract" at the start of a paper → translate as the standard academic term (e.g., 초록 in Korean).
 - Preserve the original structure. Do not merge or split items.
 - Output ONLY a JSON array: [{{"index": N, "action": "translate"|"skip", "text": "..."}}]

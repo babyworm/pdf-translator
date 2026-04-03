@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 
 from pdf_translator.core.extractor import Element
 
@@ -8,6 +9,77 @@ from pdf_translator.core.extractor import Element
 _MATH_WEAK = re.compile(r"[=±×÷⟨⟩‖]")
 # Symbols where even 1 occurrence strongly signals math
 _MATH_STRONG = re.compile(r"[∑∫∏∂∇√∞≈≠≤≥∈∉⊂⊃∀∃∧∨¬αβγδεζηθλμσφψω]")
+
+# Sentence-ending punctuation (including CJK fullwidth variants)
+_SENTENCE_END = re.compile(r'[.!?;:。！？；：…]\s*$')
+
+# Patterns that indicate non-prose elements to skip during merging
+_SKIP_PATTERN = re.compile(
+    r'^\s*(?:'
+    r'©|®|™|All [Rr]ights [Rr]eserved|'
+    r'[Ll]icen[cs]|[Cc]opyright|'
+    r'ISSN|ISBN|DOI\s*:|'
+    r'[Pp]ermission|[Dd]istribut'
+    r')',
+)
+
+
+def merge_split_sentences(elements: list[Element]) -> list[Element]:
+    """Merge elements where a sentence is split across element boundaries.
+
+    When an element does not end with sentence-ending punctuation and the next
+    prose element continues the sentence, merge them into one element.
+    License/copyright lines between them are skipped (left as separate elements).
+    """
+    if not elements:
+        return elements
+
+    result: list[Element] = []
+    i = 0
+    while i < len(elements):
+        el = deepcopy(elements[i])
+
+        # Only attempt merging for paragraph-like prose elements
+        if el.type not in ("paragraph", "caption", "list item") or is_math(el.content):
+            result.append(el)
+            i += 1
+            continue
+
+        text = el.content.rstrip()
+        # Keep merging while current text doesn't end with sentence punctuation.
+        # Skip over interstitial elements (license, footnotes, math, etc.)
+        # and reconnect sentence fragments on either side.
+        skipped: list[Element] = []
+        while not _SENTENCE_END.search(text) and i + 1 < len(elements):
+            nxt = elements[i + 1]
+            # Hard stop: headings or distant pages break the sentence
+            if nxt.type in ("heading",):
+                break
+            if abs(nxt.page_number - el.page_number) > 1:
+                break
+            # Interstitial elements: accumulate but don't merge
+            if (_SKIP_PATTERN.search(nxt.content) or is_math(nxt.content)
+                    or nxt.type not in ("paragraph", "caption", "list item")):
+                skipped.append(deepcopy(nxt))
+                i += 1
+                continue
+            # Merge prose fragment
+            el.content = text + " " + nxt.content.lstrip()
+            if el.bbox and nxt.bbox and len(el.bbox) >= 4 and len(nxt.bbox) >= 4:
+                el.bbox = [
+                    min(el.bbox[0], nxt.bbox[0]),
+                    min(el.bbox[1], nxt.bbox[1]),
+                    max(el.bbox[2], nxt.bbox[2]),
+                    max(el.bbox[3], nxt.bbox[3]),
+                ]
+            text = el.content.rstrip()
+            i += 1
+
+        result.append(el)
+        result.extend(skipped)
+        i += 1
+
+    return result
 
 
 def is_math(text: str) -> bool:
@@ -43,7 +115,8 @@ def build_batches(
     max_segments: int = 40,
     max_chars: int = 4500,
 ) -> list[list[Element]]:
-    valid = [e for e in elements if e.content.strip() and not is_math(e.content)]
+    merged = merge_split_sentences(elements)
+    valid = [e for e in merged if e.content.strip() and not is_math(e.content)]
     if not valid:
         return []
 

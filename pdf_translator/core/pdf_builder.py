@@ -110,8 +110,10 @@ def _build_pdf_pdfbox(
         json_path = f.name
     try:
         _build_translations_json(elements, translations, json_path)
+        log_props = str(_JAVA_DIR / "logging.properties")
         cmd = [
-            "java", "-cp", f"{jar}:{_JAVA_DIR}",
+            "java", f"-Djava.util.logging.config.file={log_props}",
+            "-cp", f"{jar}:{_JAVA_DIR}",
             _JAVA_CLASS, src_path, json_path, dst_path,
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 from pathlib import Path
@@ -23,7 +24,7 @@ from pdf_translator.core.translator.router import BackendRouter
 console = Console()
 
 
-def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
+def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool]:
     parser = argparse.ArgumentParser(
         prog="pdf-translator",
         description="Translate PDF documents with pluggable LLM backends",
@@ -61,6 +62,8 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
                         help="Disable QA review")
     parser.add_argument("--qa-retries", type=int, default=2,
                         help="Max QA retry attempts")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="Show detailed warnings and debug info")
 
     args = parser.parse_args(argv)
     return TranslatorConfig(
@@ -80,7 +83,7 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
         ocr_engine=args.ocr_engine,
         no_qa=args.no_qa,
         qa_retries=args.qa_retries,
-    )
+    ), getattr(args, "verbose", False)
 
 
 def _run_build_from(cfg: TranslatorConfig) -> None:
@@ -481,7 +484,11 @@ def main():
     elif len(sys.argv) > 1 and sys.argv[1] == "check-deps":
         check_deps()
     else:
-        cfg = parse_args()
+        cfg, verbose = parse_args()
+        logging.basicConfig(
+            level=logging.WARNING if verbose else logging.ERROR,
+            format="%(name)s: %(message)s",
+        )
         if not cfg.input_path and not cfg.build_from and not cfg.retranslate:
             parse_args(["--help"])
         run(cfg)

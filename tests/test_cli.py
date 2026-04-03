@@ -5,7 +5,7 @@ from pdf_translator.cli.main import parse_args
 
 
 def test_parse_args_minimal():
-    cfg, _ = parse_args(["input.pdf"])
+    cfg, _, _ = parse_args(["input.pdf"])
     assert cfg.input_path == "input.pdf"
     assert cfg.output_dir == "./output"
     assert cfg.workers == min(os.cpu_count() or 4, 8)
@@ -18,7 +18,7 @@ def test_parse_args_minimal():
 
 
 def test_parse_args_all_options():
-    cfg, _ = parse_args([
+    cfg, _, _ = parse_args([
         "doc.pdf",
         "--output-dir", "/tmp/out",
         "--workers", "8",
@@ -41,34 +41,34 @@ def test_parse_args_all_options():
 
 
 def test_parse_args_glossary():
-    cfg, _ = parse_args(["test.pdf", "--glossary", "ml-ai"])
+    cfg, _, _ = parse_args(["test.pdf", "--glossary", "ml-ai"])
     assert cfg.glossary == "ml-ai"
 
 
 def test_parse_args_draft_only():
-    cfg, _ = parse_args(["test.pdf", "--draft-only"])
+    cfg, _, _ = parse_args(["test.pdf", "--draft-only"])
     assert cfg.draft_only is True
 
 
 def test_parse_args_build_from():
-    cfg, _ = parse_args(["--build-from", "draft.json"])
+    cfg, _, _ = parse_args(["--build-from", "draft.json"])
     assert cfg.build_from == "draft.json"
     assert cfg.input_path == ""
 
 
 def test_parse_args_retranslate():
-    cfg, _ = parse_args(["--retranslate", "draft.json"])
+    cfg, _, _ = parse_args(["--retranslate", "draft.json"])
     assert cfg.retranslate == "draft.json"
     assert cfg.input_path == ""
 
 
 def test_parse_args_ocr_engine():
-    cfg, _ = parse_args(["test.pdf", "--ocr-engine", "tesseract"])
+    cfg, _, _ = parse_args(["test.pdf", "--ocr-engine", "tesseract"])
     assert cfg.ocr_engine == "tesseract"
 
 
 def test_parse_args_defaults_new_fields():
-    cfg, _ = parse_args(["test.pdf"])
+    cfg, _, _ = parse_args(["test.pdf"])
     assert cfg.glossary is None
     assert cfg.draft_only is False
     assert cfg.build_from is None
@@ -79,21 +79,21 @@ def test_parse_args_defaults_new_fields():
 def test_parse_args_serve_not_crash():
     """Verify serve mode doesn't interfere with normal arg parsing."""
     from pdf_translator.cli.main import parse_args
-    cfg, _ = parse_args(["test.pdf"])
+    cfg, _, _ = parse_args(["test.pdf"])
     assert cfg.input_path == "test.pdf"
 
 
 def test_parse_args_qa_defaults():
-    cfg, _ = parse_args(["input.pdf"])
+    cfg, _, _ = parse_args(["input.pdf"])
     assert cfg.no_qa is False
     assert cfg.qa_retries == 2
 
 
 def test_parse_args_no_qa():
-    cfg, _ = parse_args(["input.pdf", "--no-qa"])
+    cfg, _, _ = parse_args(["input.pdf", "--no-qa"])
     assert cfg.no_qa is True
 
 
 def test_parse_args_qa_retries():
-    cfg, _ = parse_args(["input.pdf", "--qa-retries", "3"])
+    cfg, _, _ = parse_args(["input.pdf", "--qa-retries", "3"])
     assert cfg.qa_retries == 3

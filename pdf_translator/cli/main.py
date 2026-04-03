@@ -24,7 +24,7 @@ from pdf_translator.core.translator.router import BackendRouter
 console = Console()
 
 
-def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool]:
+def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool, str]:
     parser = argparse.ArgumentParser(
         prog="pdf-translator",
         description="Translate PDF documents with pluggable LLM backends",
@@ -62,6 +62,8 @@ def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool]:
                         help="Disable QA review")
     parser.add_argument("--qa-retries", type=int, default=2,
                         help="Max QA retry attempts")
+    parser.add_argument("--mode", default="md", choices=["md", "layout"],
+                        help="Translation mode: md (markdown-based) or layout (PDF layout-preserving)")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Show detailed warnings and debug info")
 
@@ -83,7 +85,7 @@ def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool]:
         ocr_engine=args.ocr_engine,
         no_qa=args.no_qa,
         qa_retries=args.qa_retries,
-    ), getattr(args, "verbose", False)
+    ), getattr(args, "verbose", False), getattr(args, "mode", "md")
 
 
 def _run_build_from(cfg: TranslatorConfig) -> None:
@@ -178,6 +180,69 @@ def _run_retranslate(cfg: TranslatorConfig) -> None:
 
     draft.save(str(draft_path))
     console.print(f"  Updated draft: [green]{draft_path}[/green]")
+    console.print("[bold green]Done![/bold green]")
+
+
+def run_md(cfg: TranslatorConfig) -> None:
+    """Markdown-based translation pipeline."""
+    from pdf_translator.core.md_extractor import (
+        clean_markdown,
+        extract_markdown,
+        split_paragraphs,
+        truncate_at_references,
+    )
+    from pdf_translator.core.md_translator import translate_markdown
+
+    input_path = Path(cfg.input_path)
+    if not input_path.exists():
+        console.print(f"[red]Error: {input_path} not found[/red]")
+        sys.exit(1)
+
+    output_dir = Path(cfg.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stem = input_path.stem
+
+    console.print("[bold]Extracting markdown...[/bold]")
+    raw_md = extract_markdown(str(input_path), pages=cfg.pages)
+    cleaned = clean_markdown(raw_md)
+    body = truncate_at_references(cleaned)
+    paragraphs = split_paragraphs(body)
+    console.print(f"  Extracted [cyan]{len(paragraphs)}[/cyan] paragraphs")
+
+    if cfg.source_lang == "auto":
+        from pdf_translator.core.translator import detect_language
+        from pdf_translator.core.extractor import Element
+        sample = [Element(type="paragraph", content=p, page_number=1, bbox=[0, 0, 0, 0])
+                  for p in paragraphs[:5] if not p.startswith('#') and not p.startswith('!')]
+        if sample:
+            cfg.source_lang = detect_language(sample)
+            from pdf_translator.core.translator.base import LANG_NAMES
+            lang_label = LANG_NAMES.get(cfg.source_lang, cfg.source_lang)
+            console.print(f"  Detected language: [cyan]{lang_label}[/cyan]")
+
+    glossary_dict = None
+    if cfg.glossary:
+        glossary = load_glossary(cfg.glossary)
+        if glossary:
+            glossary_dict = glossary.to_prompt_dict()
+            console.print(f"  Glossary: [cyan]{cfg.glossary}[/cyan] ({len(glossary_dict)} terms)")
+
+    console.print("[bold]Translating...[/bold]")
+    translated_md = translate_markdown(
+        paragraphs,
+        source_lang=cfg.source_lang,
+        target_lang=cfg.target_lang,
+        backend=cfg.backend,
+        effort=cfg.effort,
+        workers=cfg.workers,
+        glossary=glossary_dict,
+        use_cache=cfg.use_cache,
+        output_dir=cfg.output_dir,
+    )
+
+    md_out = output_dir / f"{stem}_{cfg.target_lang}.md"
+    md_out.write_text(translated_md, encoding="utf-8")
+    console.print(f"  Markdown: [green]{md_out}[/green]")
     console.print("[bold green]Done![/bold green]")
 
 
@@ -484,7 +549,7 @@ def main():
     elif len(sys.argv) > 1 and sys.argv[1] == "check-deps":
         check_deps()
     else:
-        cfg, verbose = parse_args()
+        cfg, verbose, mode = parse_args()
         logging.basicConfig(
             level=logging.WARNING if verbose else logging.ERROR,
             format="%(name)s: %(message)s",
@@ -495,7 +560,10 @@ def main():
             os.environ["JAVA_TOOL_OPTIONS"] = f"-Djava.util.logging.config.file={log_props}"
         if not cfg.input_path and not cfg.build_from and not cfg.retranslate:
             parse_args(["--help"])
-        run(cfg)
+        if mode == "md" and not cfg.build_from and not cfg.retranslate:
+            run_md(cfg)
+        else:
+            run(cfg)
 
 
 if __name__ == "__main__":

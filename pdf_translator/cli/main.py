@@ -209,6 +209,11 @@ def run_md(cfg: TranslatorConfig) -> None:
     paragraphs = split_paragraphs(body)
     console.print(f"  Extracted [cyan]{len(paragraphs)}[/cyan] paragraphs")
 
+    # Save source markdown
+    src_md_out = output_dir / f"{stem}_src.md"
+    src_md_out.write_text(body, encoding="utf-8")
+    console.print(f"  Source markdown: [green]{src_md_out}[/green]")
+
     if cfg.source_lang == "auto":
         from pdf_translator.core.translator import detect_language
         from pdf_translator.core.extractor import Element

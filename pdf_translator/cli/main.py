@@ -24,7 +24,7 @@ from pdf_translator.core.translator.router import BackendRouter
 console = Console()
 
 
-def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool, str]:
+def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool, str, str | None]:
     parser = argparse.ArgumentParser(
         prog="pdf-translator",
         description="Translate PDF documents with pluggable LLM backends",
@@ -64,6 +64,8 @@ def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool, s
                         help="Max QA retry attempts")
     parser.add_argument("--mode", default="md", choices=["md", "layout"],
                         help="Translation mode: md (markdown-based) or layout (PDF layout-preserving)")
+    parser.add_argument("--hybrid", default=None, const="docling-fast", nargs="?",
+                        help="Use hybrid AI backend for better reading order on complex layouts")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Show detailed warnings and debug info")
 
@@ -85,7 +87,7 @@ def parse_args(argv: list[str] | None = None) -> tuple[TranslatorConfig, bool, s
         ocr_engine=args.ocr_engine,
         no_qa=args.no_qa,
         qa_retries=args.qa_retries,
-    ), getattr(args, "verbose", False), getattr(args, "mode", "md")
+    ), getattr(args, "verbose", False), getattr(args, "mode", "md"), getattr(args, "hybrid", None)
 
 
 def _run_build_from(cfg: TranslatorConfig) -> None:
@@ -183,7 +185,7 @@ def _run_retranslate(cfg: TranslatorConfig) -> None:
     console.print("[bold green]Done![/bold green]")
 
 
-def run_md(cfg: TranslatorConfig) -> None:
+def run_md(cfg: TranslatorConfig, hybrid: str | None = None) -> None:
     """Markdown-based translation pipeline."""
     from pdf_translator.core.md_extractor import (
         clean_markdown,
@@ -203,7 +205,7 @@ def run_md(cfg: TranslatorConfig) -> None:
     stem = input_path.stem
 
     console.print("[bold]Extracting markdown...[/bold]")
-    raw_md = extract_markdown(str(input_path), pages=cfg.pages)
+    raw_md = extract_markdown(str(input_path), pages=cfg.pages, hybrid=hybrid)
     cleaned = clean_markdown(raw_md)
     body = truncate_at_references(cleaned)
     paragraphs = split_paragraphs(body)
@@ -554,7 +556,7 @@ def main():
     elif len(sys.argv) > 1 and sys.argv[1] == "check-deps":
         check_deps()
     else:
-        cfg, verbose, mode = parse_args()
+        cfg, verbose, mode, hybrid = parse_args()
         logging.basicConfig(
             level=logging.WARNING if verbose else logging.ERROR,
             format="%(name)s: %(message)s",
@@ -566,7 +568,7 @@ def main():
         if not cfg.input_path and not cfg.build_from and not cfg.retranslate:
             parse_args(["--help"])
         if mode == "md" and not cfg.build_from and not cfg.retranslate:
-            run_md(cfg)
+            run_md(cfg, hybrid=hybrid)
         else:
             run(cfg)
 

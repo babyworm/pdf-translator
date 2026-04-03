@@ -11,8 +11,18 @@ import tempfile
 from pathlib import Path
 
 
-def extract_markdown(pdf_path: str, pages: str | None = None) -> str:
-    """Extract markdown from PDF using opendataloader."""
+def extract_markdown(
+    pdf_path: str,
+    pages: str | None = None,
+    hybrid: str | None = None,
+) -> str:
+    """Extract markdown from PDF using opendataloader.
+
+    Args:
+        hybrid: Hybrid backend for better reading order on complex layouts.
+                E.g., "docling-fast". Requires: pip install "opendataloader-pdf[hybrid]"
+                and a running server: opendataloader-pdf-hybrid --port 5002
+    """
     import opendataloader_pdf
 
     work_dir = tempfile.mkdtemp(prefix="pdf_md_")
@@ -21,9 +31,12 @@ def extract_markdown(pdf_path: str, pages: str | None = None) -> str:
             input_path=pdf_path,
             output_dir=work_dir,
             format="markdown",
+            quiet=True,
         )
         if pages:
             convert_args["pages"] = pages
+        if hybrid:
+            convert_args["hybrid"] = hybrid
 
         opendataloader_pdf.convert(**convert_args)
 
@@ -48,9 +61,11 @@ _REFERENCES = re.compile(r'^#+\s*(?:References|Bibliography|REFERENCES)\s*$', re
 # Decorative / metadata patterns to remove or keep as-is
 _DECORATIVE = re.compile(
     r'^(?:'
-    r'Authorized licensed use limited to.*$|'
-    r'Downloaded on\s.*$|'
-    r'\d+-\d+/\$\d+\.\d+\s+©.*$'
+    r'(?:#\s*)?Authorized licensed use limited to.*$|'
+    r'(?:#\s*)?Downloaded on\s.*$|'
+    r'\d+-\d+/\$\d+\.\d+\s+©.*$|'
+    r'(?:#\s*)?\d+\s+IEEE TRANSACTIONS.*$|'
+    r'(?:#\s*)?[A-Z]+\s+et\s+al\.:\s+[A-Z].*\d+\s*$'
     r')',
     re.MULTILINE,
 )

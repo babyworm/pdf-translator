@@ -217,8 +217,8 @@ def run_md(cfg: TranslatorConfig, hybrid: str | None = None) -> None:
     console.print(f"  Source markdown: [green]{src_md_out}[/green]")
 
     if cfg.source_lang == "auto":
-        from pdf_translator.core.translator import detect_language
         from pdf_translator.core.extractor import Element
+        from pdf_translator.core.translator import detect_language
         sample = [Element(type="paragraph", content=p, page_number=1, bbox=[0, 0, 0, 0])
                   for p in paragraphs[:5] if not p.startswith('#') and not p.startswith('!')]
         if sample:

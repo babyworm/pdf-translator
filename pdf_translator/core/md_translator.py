@@ -117,8 +117,8 @@ def translate_markdown(
     from pathlib import Path
 
     from pdf_translator.core.cache import TranslationCache
-    from pdf_translator.core.translator import translate_all
     from pdf_translator.core.extractor import Element
+    from pdf_translator.core.translator import translate_all
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)

@@ -7,10 +7,11 @@ PDF 문서를 추출하고 병렬 번역하여, 원본 레이아웃을 유지한
 ```mermaid
 flowchart LR
     A[입력 PDF] --> B[추출\nopendataloader-pdf\n+ OCR]
-    B --> C[청킹\n≤40 세그먼트\n≤4500자]
-    C --> D[번역\nCLI / API / Google]
-    D --> E1[PDF\n레이아웃 보존]
-    D --> E2[Markdown\n구조화]
+    B --> C[청킹\n≤40 세그먼트\n≤4500자\n수식 자동 감지]
+    C --> D[번역\nLayout-aware LLM\nCLI / API / Google]
+    D --> QA[QA\nPre-build Review\nPost-build 검증\n자동 재번역]
+    QA --> E1[PDF\nPDFBox 레이아웃 보존]
+    QA --> E2[Markdown\n구조화]
     D --> E3[Draft JSON\n리뷰/편집]
 ```
 
@@ -18,7 +19,10 @@ flowchart LR
 
 - **다중 백엔드**: Codex CLI, Claude CLI, Gemini CLI (무료) + OpenAI, Anthropic, Google, OpenRouter API
 - **자동 백엔드 선택**: CLI 우선 → API 폴백 → Google Translate 최종 폴백
-- **레이아웃 보존**: PyMuPDF Redaction API + insert_htmlbox로 원본 폰트/색상/구조 유지
+- **레이아웃 보존**: Apache PDFBox (Java) 기반 PDF 빌드. 원본 텍스트 위치에 번역 오버레이. pypdf+reportlab 폴백
+- **Layout-aware 번역**: bbox 크기를 LLM에 전달하여 공간 인식 번역. 수식/변수 자동 skip
+- **QA 파이프라인**: Pre-build 이상 감지 + Post-build 텍스트 검증 + 자동 재번역 (최대 N회)
+- **수식 보존**: strong/weak 기호 분류로 수식 자동 감지. 번역하지 않고 원본 유지
 - **용어집**: 3단 구조 (내장 팩 + keep-as-is 규칙 + 사용자 용어집). 과번역/과소번역 방지
 - **OCR**: Surya (ML 기반, 기본) + Tesseract (경량 폴백). 스캔 PDF 자동 감지
 - **Draft 모드**: JSON 중간 결과 저장 → 수정 → 재빌드. 번역 리뷰 워크플로우
@@ -27,7 +31,7 @@ flowchart LR
 ## 요구사항
 
 - Python 3.10+
-- Java 11+ (opendataloader-pdf 의존성)
+- Java 11+ (opendataloader-pdf + PDFBox PDF 빌더)
 
 ## 설치
 
@@ -103,6 +107,8 @@ pdf-translator input.pdf [옵션]
 | `--glossary` | - | 용어집 CSV 경로 또는 내장 팩 이름 |
 | `--pages` | 전체 | 처리할 페이지 (예: `1,3,5-7`) |
 | `--no-cache` | false | SQLite 번역 캐시 비활성화 |
+| `--no-qa` | false | QA 리뷰 비활성화 |
+| `--qa-retries` | `2` | QA 자동 재번역 최대 횟수 |
 | `--draft-only` | false | Draft JSON만 저장, PDF 빌드 생략 |
 | `--build-from` | - | Draft JSON에서 PDF/MD 빌드 |
 | `--retranslate` | - | Draft의 미완료 항목 재번역 |
@@ -125,7 +131,7 @@ pdf-translator input.pdf [옵션]
 ### 예시
 
 ```bash
-# 기본: 자동 백엔드로 영어 PDF를 한국어로 번역
+# 기본: 자동 백엔드로 영어 PDF를 한국어로 번역 (QA 포함)
 pdf-translator paper.pdf
 
 # Claude CLI + ML 용어집
@@ -133,6 +139,12 @@ pdf-translator paper.pdf --backend claude-cli --glossary ml-ai
 
 # OpenAI API, 특정 페이지만
 pdf-translator document.pdf --backend openai-api --pages 1-10
+
+# QA 없이 빠르게 번역
+pdf-translator paper.pdf --no-qa
+
+# QA 재시도 3회
+pdf-translator paper.pdf --qa-retries 3
 
 # Draft만 저장 (리뷰용)
 pdf-translator paper.pdf --draft-only --glossary terms.csv
@@ -145,7 +157,33 @@ pdf-translator --retranslate output/paper_draft.json --backend openai-api
 
 # 스캔 PDF + Tesseract OCR
 pdf-translator scanned.pdf --ocr-engine tesseract
+
+# 의존성 확인
+pdf-translator check-deps
 ```
+
+## QA 파이프라인
+
+기본적으로 QA가 활성화되어 번역 품질을 자동으로 검증합니다.
+
+```
+번역 → Pre-build Review → PDF 빌드 → Post-build QA → (문제 시 자동 재번역)
+```
+
+### Pre-build Review
+- 번역이 비었거나 원본과 동일한 경우 감지
+- bbox 대비 번역 텍스트 오버플로 예측
+- 이상 항목만 LLM에 전송하여 수정/유지/건너뛰기 판단
+
+### Post-build QA
+- 빌드된 PDF에서 텍스트를 재추출하여 원본과 비교
+- 누락된 세그먼트, 원본 텍스트 잔존 감지
+- 문제 페이지만 LLM에 전송하여 재번역 대상 결정
+
+### 자동 재번역
+- 문제가 있는 세그먼트만 선별적으로 재번역 (전체 재번역 아님)
+- `--qa-retries N`으로 최대 반복 횟수 제어 (기본 2)
+- `--no-qa`로 비활성화 가능
 
 ## 용어집
 
@@ -154,7 +192,7 @@ pdf-translator scanned.pdf --ocr-engine tesseract
 | 팩 이름 | 내용 |
 |---------|------|
 | `cs-general` | CS 일반 용어 (API, GPU, SDK 등 28개 keep 규칙) |
-| `ml-ai` | ML/AI 용어 (BERT, transformer 등 27개 keep+translate 혼합) |
+| `ml-ai` | ML/AI 용어 (BERT, transformer, attention 등 41개 keep+translate 혼합) |
 
 ```bash
 pdf-translator paper.pdf --glossary cs-general
@@ -235,27 +273,30 @@ output/
 pdf_translator/
 ├── core/                   # 순수 라이브러리 (비즈니스 로직)
 │   ├── __init__.py         # translate_pdf() 공개 API
-│   ├── extractor.py        # opendataloader-pdf 래퍼
-│   ├── chunker.py          # 이중 제약 배치 빌더
+│   ├── extractor.py        # opendataloader-pdf 래퍼 + Java 체크
+│   ├── chunker.py          # 배치 빌더 + 수식 감지 (is_math)
 │   ├── cache.py            # SQLite 번역 캐시
 │   ├── config.py           # TranslatorConfig
 │   ├── glossary.py         # 용어집 (3단 구조)
 │   ├── draft.py            # Draft JSON 관리
-│   ├── pdf_builder.py      # PyMuPDF 레이아웃 보존 (Redaction API)
+│   ├── qa.py               # QA 파이프라인 (pre/post-build)
+│   ├── pdf_builder.py      # PDF 빌드 (PDFBox primary + reportlab fallback)
 │   ├── md_builder.py       # GFM Markdown 생성
 │   └── translator/         # 번역 엔진
-│       ├── base.py         # TranslationBackend Protocol
+│       ├── base.py         # Protocol + 프롬프트 빌더 + QA 프롬프트
 │       ├── router.py       # 백엔드 자동 선택
 │       └── backends/       # 백엔드 구현체 (8개)
+├── java/                   # Java PDF 빌더 (Apache PDFBox)
+│   └── PdfBuilder.java     # 자동 컴파일, subprocess 호출
 ├── ocr/                    # OCR 파이프라인
 │   ├── base.py             # OCREngine Protocol
-│   ├── detector.py         # 스캔 PDF 자동 감지
+│   ├── detector.py         # 스캔 PDF 자동 감지 (pypdf)
 │   ├── surya_engine.py     # Surya (ML 기반)
 │   └── tesseract_engine.py # Tesseract (경량)
 ├── cli/                    # CLI 진입점
 │   └── main.py
 ├── web/                    # 웹 애플리케이션
-│   ├── app.py              # FastAPI 서버
+│   ├── app.py              # FastAPI 서버 (lifespan 핸들러)
 │   ├── models.py           # SQLite 모델
 │   └── frontend/           # React + TypeScript SPA
 └── data/
@@ -271,4 +312,6 @@ python -m pytest tests/ -v
 
 ## 라이선스
 
-[MIT](LICENSE)
+[MIT](LICENSE) — 모든 core 의존성은 permissive 라이선스 (MIT/BSD/Apache).
+
+자세한 내용은 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)를 참조하세요.

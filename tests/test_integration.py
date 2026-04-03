@@ -66,8 +66,8 @@ def test_end_to_end_with_mock_codex():
             run(cfg)
 
         out_dir = Path(d) / "output"
-        assert (out_dir / "test_translated.pdf").exists()
-        assert (out_dir / "test_translated.md").exists()
+        assert (out_dir / "test_ko.pdf").exists()
+        assert (out_dir / "test_ko.md").exists()
 
-        md_content = (out_dir / "test_translated.md").read_text()
+        md_content = (out_dir / "test_ko.md").read_text()
         assert "[KO]" in md_content

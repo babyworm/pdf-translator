@@ -72,10 +72,10 @@ def translate_pdf(
             cache.flush()
             cache.close()
 
-    pdf_out = str(out_dir / f"{stem}_translated.pdf")
+    pdf_out = str(out_dir / f"{stem}_{target_lang}.pdf")
     build_pdf(str(input_p), pdf_out, elements, translations)
 
-    md_out = out_dir / f"{stem}_translated.md"
+    md_out = out_dir / f"{stem}_{target_lang}.md"
     md_content = build_markdown(elements, translations)
     md_out.write_text(md_content, encoding="utf-8")
 

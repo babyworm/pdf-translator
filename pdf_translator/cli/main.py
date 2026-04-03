@@ -27,6 +27,14 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
     parser = argparse.ArgumentParser(
         prog="pdf-translator",
         description="Translate PDF documents with pluggable LLM backends",
+        epilog="examples:\n"
+               "  pdf-translator paper.pdf                          # translate to Korean (default)\n"
+               "  pdf-translator paper.pdf --target-lang ja         # translate to Japanese\n"
+               "  pdf-translator paper.pdf --backend claude-cli     # use Claude backend\n"
+               "  pdf-translator paper.pdf --glossary cs-general    # with CS glossary\n"
+               "  pdf-translator serve                              # start web UI\n"
+               "  pdf-translator check-deps                         # check dependencies",
+        formatter_class=type("_Fmt", (argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter), {}),
     )
     parser.add_argument("input", nargs="?", default=None, help="Input PDF file path")
     parser.add_argument("--output-dir", default="./output", help="Output directory")
@@ -50,9 +58,9 @@ def parse_args(argv: list[str] | None = None) -> TranslatorConfig:
     parser.add_argument("--ocr-engine", default="auto",
                         help="OCR engine (auto, surya, tesseract, none)")
     parser.add_argument("--no-qa", action="store_true",
-                        help="Disable QA review (default: QA enabled)")
+                        help="Disable QA review")
     parser.add_argument("--qa-retries", type=int, default=2,
-                        help="Max QA retry attempts (default: 2)")
+                        help="Max QA retry attempts")
 
     args = parser.parse_args(argv)
     return TranslatorConfig(
@@ -92,17 +100,18 @@ def _run_build_from(cfg: TranslatorConfig) -> None:
         sys.exit(1)
 
     stem = source_path.stem
+    lang = draft.target_lang or cfg.target_lang
     translations = draft.to_translations()
     elements = extract_pdf(str(source_path), output_dir=str(output_dir), pages=cfg.pages)
 
     console.print(f"  Draft: [cyan]{len(draft.elements)}[/cyan] elements, "
                   f"[cyan]{len(translations)}[/cyan] translated")
 
-    pdf_out = str(output_dir / f"{stem}_translated.pdf")
+    pdf_out = str(output_dir / f"{stem}_{lang}.pdf")
     build_pdf(str(source_path), pdf_out, elements, translations)
     console.print(f"  PDF: [green]{pdf_out}[/green]")
 
-    md_out = output_dir / f"{stem}_translated.md"
+    md_out = output_dir / f"{stem}_{lang}.md"
     md_content = build_markdown(elements, translations)
     md_out.write_text(md_content, encoding="utf-8")
     console.print(f"  Markdown: [green]{md_out}[/green]")
@@ -265,7 +274,7 @@ def run(cfg: TranslatorConfig) -> None:
                 progress.update(task, advance=1)
             else:
                 progress.update(task, description="Generating output...")
-                pdf_out = str(output_dir / f"{stem}_translated.pdf")
+                pdf_out = str(output_dir / f"{stem}_{cfg.target_lang}.pdf")
 
                 if cfg.no_qa:
                     build_pdf(str(input_path), pdf_out, elements, translations)
@@ -354,7 +363,7 @@ def run(cfg: TranslatorConfig) -> None:
 
                     console.print(f"  PDF: [green]{pdf_out}[/green]")
 
-                md_out = output_dir / f"{stem}_translated.md"
+                md_out = output_dir / f"{stem}_{cfg.target_lang}.md"
                 md_content = build_markdown(elements, translations)
                 md_out.write_text(md_content, encoding="utf-8")
                 console.print(f"  Markdown: [green]{md_out}[/green]")
@@ -473,6 +482,8 @@ def main():
         check_deps()
     else:
         cfg = parse_args()
+        if not cfg.input_path and not cfg.build_from and not cfg.retranslate:
+            parse_args(["--help"])
         run(cfg)
 
 

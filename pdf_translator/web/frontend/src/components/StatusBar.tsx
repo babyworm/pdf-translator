@@ -20,7 +20,7 @@ export function StatusBar({ project, draft, connected }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${project.filename.replace('.pdf', '')}_translated.${type}`
+    a.download = `${project.filename.replace('.pdf', '')}_${project.target_lang || 'ko'}.${type}`
     a.click()
     URL.revokeObjectURL(url)
   }

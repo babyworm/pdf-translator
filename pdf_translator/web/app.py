@@ -238,7 +238,7 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
         if project is None:
             raise HTTPException(status_code=404, detail="Project not found")
         output_dir = uploads_dir / project_id / "output"
-        pdf_files = list(output_dir.glob("*_translated.pdf"))
+        pdf_files = sorted(output_dir.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not pdf_files:
             raise HTTPException(status_code=404, detail="Translated PDF not found")
         return FileResponse(str(pdf_files[0]), media_type="application/pdf",
@@ -250,7 +250,7 @@ def create_app(data_dir: str = "./pdf_translator_data") -> FastAPI:
         if project is None:
             raise HTTPException(status_code=404, detail="Project not found")
         output_dir = uploads_dir / project_id / "output"
-        md_files = list(output_dir.glob("*_translated.md"))
+        md_files = sorted(output_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
         if not md_files:
             raise HTTPException(status_code=404, detail="Translated Markdown not found")
         return FileResponse(str(md_files[0]), media_type="text/markdown",

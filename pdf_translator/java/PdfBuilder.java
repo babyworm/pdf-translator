@@ -327,33 +327,34 @@ public class PdfBuilder {
         return total;
     }
 
-    // Kinsoku (금칙) — characters prohibited at line start
-    private static final String KINSOKU_START =
-        "）、。，．：；？！」』】〉》〕）｝,.;:?!)]}…‥·ー々ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ";
-    // Kinsoku — characters prohibited at line end
-    private static final String KINSOKU_END = "（「『【〈《〔（｛([{";
+    // Kinsoku (금칙) — punctuation that must not start a line
+    private static final String KINSOKU_NO_START = "）、。，．：；？！」』】〉》〕｝,.;:?!)]}…‥";
+    // Kinsoku — brackets that must not end a line
+    private static final String KINSOKU_NO_END = "（「『【〈《〔｛([{";
+    private static final int KINSOKU_MARGIN = 2;
 
     private static List<String> wrapText(String text, float fontSize, float boxWidth, PDFont font) {
         List<String> lines = new ArrayList<>();
         if (boxWidth <= 0) { lines.add(text); return lines; }
         StringBuilder cur = new StringBuilder();
         float curW = 0;
+        int overflow = 0;
         for (int i = 0; i < text.length(); i++) {
             char ch = text.charAt(i);
-            if (ch == '\n') { lines.add(cur.toString()); cur = new StringBuilder(); curW = 0; continue; }
+            if (ch == '\n') { lines.add(cur.toString()); cur = new StringBuilder(); curW = 0; overflow = 0; continue; }
             float cw;
             try {
                 PDFont f = fontForChar(ch, font);
                 cw = f.getStringWidth(String.valueOf(ch)) / 1000f * fontSize;
             } catch (Exception e) { cw = fontSize * 0.6f; }
             if (curW + cw > boxWidth && cur.length() > 0) {
-                // Kinsoku: don't break if current char would start the next line improperly
-                if (KINSOKU_START.indexOf(ch) >= 0) { cur.append(ch); curW += cw; continue; }
-                // Kinsoku: don't leave line-end prohibited char at end of line
-                if (cur.length() > 0 && KINSOKU_END.indexOf(cur.charAt(cur.length() - 1)) >= 0) {
-                    cur.append(ch); curW += cw; continue;
+                if (overflow < KINSOKU_MARGIN) {
+                    if (KINSOKU_NO_START.indexOf(ch) >= 0 ||
+                        (cur.length() > 0 && KINSOKU_NO_END.indexOf(cur.charAt(cur.length() - 1)) >= 0)) {
+                        cur.append(ch); curW += cw; overflow++; continue;
+                    }
                 }
-                lines.add(cur.toString()); cur = new StringBuilder(); curW = 0;
+                lines.add(cur.toString()); cur = new StringBuilder(); curW = 0; overflow = 0;
             }
             cur.append(ch); curW += cw;
         }

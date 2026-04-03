@@ -57,11 +57,14 @@ def build_prompt(
 Translate the following text from {src_name} to {tgt_name}.
 
 RULES:
-- Translate ALL prose text thoroughly. Do not leave sentences or phrases untranslated.
-- Translate general technical terms into the target language (e.g., "method" → "방법", "result" → "결과", "performance" → "성능").
-- Only keep these in the original language: proper nouns, model names, dataset names, and widely-known abbreviations (e.g., Transformer, BLEU, LSTM, ImageNet).
-- Do NOT translate mathematical formulas, equations, or variable names.
-- "Abstract" at the start of an academic paper should be translated as the standard academic term (e.g., 초록 in Korean).
+- Translate EVERY word and phrase into {tgt_name}. Nothing should remain in the source language except:
+  * Proper nouns (person/company/place names)
+  * Model/dataset names (e.g., Transformer, ImageNet, BERT)
+  * Widely-known abbreviations (e.g., BLEU, LSTM, API, GPU)
+  * Mathematical formulas, equations, and variable names
+- This includes common English words like "the", "of", "with", "based", "using", etc. — translate them all.
+- Translate ALL technical AND general terms (e.g., "method" → "방법", "performance" → "성능", "approach" → "접근법", "framework" → "프레임워크", "contribution" → "기여").
+- "Abstract" → standard academic term (e.g., 초록 in Korean).
 - Preserve the original structure and formatting.
 - Input is a JSON array of indexed items.
 - Output ONLY a JSON array in the same order with translated text.
@@ -104,9 +107,12 @@ RULES:
 - For each item, decide: "action": "translate" or "action": "skip".
 - Set action to "skip" for: mathematical formulas, equations, variable declarations, citation numbers, page numbers.
 - Set action to "translate" for: headings, paragraphs, captions, author info, footnotes.
-- Translate ALL prose text thoroughly. Do not leave sentences or phrases untranslated.
-- Translate general technical terms into the target language (e.g., "method" → "방법", "result" → "결과", "performance" → "성능").
-- Only keep in original language: proper nouns, model names, dataset names, and widely-known abbreviations (e.g., Transformer, BLEU, LSTM, ImageNet).
+- Translate EVERY word and phrase into {tgt_name}. Nothing should remain in the source language except:
+  * Proper nouns (person/company/place names)
+  * Model/dataset names (e.g., Transformer, ImageNet, BERT)
+  * Widely-known abbreviations (e.g., BLEU, LSTM, API, GPU)
+- This includes common English words like "the", "of", "with", "based", "using", etc. — translate them all.
+- Translate ALL technical AND general terms (e.g., "method" → "방법", "performance" → "성능", "approach" → "접근법", "framework" → "프레임워크").
 - When translating, be aware of the text area size. If the area is small, keep the translation concise.
 - "Abstract" at the start of a paper → translate as the standard academic term (e.g., 초록 in Korean).
 - Preserve the original structure. Do not merge or split items.

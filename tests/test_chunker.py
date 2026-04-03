@@ -53,9 +53,8 @@ def test_merge_skips_over_license():
     texts = [e.content for batch in batches for e in batch]
     # Fragments should be merged, skipping the license element
     assert "This is a sentence that continues here." in texts
-    # License element is preserved separately (but filtered by build_batches
-    # only if it has content — it does, so it appears)
-    assert any("Copyright" in t for t in texts)
+    # License element is excluded from translation batches
+    assert not any("Copyright" in t for t in texts)
 
 
 def test_merge_skips_over_math():

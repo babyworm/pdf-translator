@@ -489,6 +489,10 @@ def main():
             level=logging.WARNING if verbose else logging.ERROR,
             format="%(name)s: %(message)s",
         )
+        if not verbose:
+            # Suppress Java library warnings (PDFBox, verapdf, etc.)
+            log_props = str(Path(__file__).resolve().parent.parent / "java" / "logging.properties")
+            os.environ["JAVA_TOOL_OPTIONS"] = f"-Djava.util.logging.config.file={log_props}"
         if not cfg.input_path and not cfg.build_from and not cfg.retranslate:
             parse_args(["--help"])
         run(cfg)

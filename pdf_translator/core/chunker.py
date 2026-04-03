@@ -23,6 +23,38 @@ _SKIP_PATTERN = re.compile(
     r')',
 )
 
+# Decorative / positional elements: skip translation to preserve layout
+_NO_TRANSLATE = re.compile(
+    r'^\s*(?:'
+    r'©|®|™|All [Rr]ights [Rr]eserved|'
+    r'[Ll]icen[cs]e|[Cc]opyright|'
+    r'ISSN\s|ISBN\s|DOI\s*:|'
+    r'[Pp]ermission\s|[Dd]istributed\s|'
+    r'[Vv]ol\.\s*\d|[Nn]o\.\s*\d|pp\.\s*\d|'
+    r'Authorized licensed use limited to|'
+    r'Downloaded on\s'
+    r')',
+)
+
+
+def _is_new_paragraph(prev: Element, nxt: Element) -> bool:
+    """Heuristic: does nxt start a new paragraph relative to prev?
+
+    Uses vertical gap between bboxes — if the gap is significantly larger
+    than the font/line height, it's likely a paragraph break.
+    """
+    if not prev.bbox or not nxt.bbox or len(prev.bbox) < 4 or len(nxt.bbox) < 4:
+        return False
+    # bbox format: [x0, y0, x1, y1] — y increases downward in PDF coordinates
+    prev_height = abs(prev.bbox[3] - prev.bbox[1])
+    line_height = max(prev_height, prev.font_size * 1.3, 10)
+    # Vertical gap between bottom of prev and top of nxt
+    gap = abs(nxt.bbox[1] - prev.bbox[3])
+    # If gap > 1.8x line height, likely a new paragraph
+    if gap > line_height * 1.8:
+        return True
+    return False
+
 
 def merge_split_sentences(elements: list[Element]) -> list[Element]:
     """Merge elements where a sentence is split across element boundaries.
@@ -30,6 +62,7 @@ def merge_split_sentences(elements: list[Element]) -> list[Element]:
     When an element does not end with sentence-ending punctuation and the next
     prose element continues the sentence, merge them into one element.
     License/copyright lines between them are skipped (left as separate elements).
+    A large vertical gap between elements signals a paragraph break and stops merging.
     """
     if not elements:
         return elements
@@ -63,6 +96,9 @@ def merge_split_sentences(elements: list[Element]) -> list[Element]:
                 skipped.append(deepcopy(nxt))
                 i += 1
                 continue
+            # Paragraph break: large vertical gap signals a new paragraph
+            if _is_new_paragraph(el, nxt):
+                break
             # Merge prose fragment
             el.content = text + " " + nxt.content.lstrip()
             if el.bbox and nxt.bbox and len(el.bbox) >= 4 and len(nxt.bbox) >= 4:
@@ -110,13 +146,33 @@ def is_math(text: str) -> bool:
     return False
 
 
+# Heading patterns that mark the start of a non-translatable section
+_REFERENCES_HEADING = re.compile(
+    r'^\s*(?:References|Bibliography|REFERENCES|BIBLIOGRAPHY|참고\s*문헌)\s*$'
+)
+
+
+def _truncate_at_references(elements: list[Element]) -> list[Element]:
+    """Remove elements from the References section onward."""
+    for i, el in enumerate(elements):
+        if el.type == "heading" and _REFERENCES_HEADING.match(el.content.strip()):
+            return elements[:i]
+    return elements
+
+
 def build_batches(
     elements: list[Element],
     max_segments: int = 40,
     max_chars: int = 4500,
 ) -> list[list[Element]]:
     merged = merge_split_sentences(elements)
-    valid = [e for e in merged if e.content.strip() and not is_math(e.content)]
+    merged = _truncate_at_references(merged)
+    valid = [
+        e for e in merged
+        if e.content.strip()
+        and not is_math(e.content)
+        and not _NO_TRANSLATE.search(e.content)
+    ]
     if not valid:
         return []
 

@@ -227,25 +227,19 @@ def _fit_fontsize(text: str, width: float, height: float, max_size: float) -> fl
     return lo
 
 
-# Kinsoku (금칙) — characters that must not appear at the start of a line
-_KINSOKU_START = set(
-    "）、。，．：；？！」』】〉》〕）｝"
-    ",.;:?!)]}…‥·"
-    "ー々ぁぃぅぇぉっゃゅょゎ"
-    "ァィゥェォッャュョヮヵヶ"
-)
-# Kinsoku — characters that must not appear at the end of a line
-_KINSOKU_END = set(
-    "（「『【〈《〔（｛"
-    "([{"
-)
+# Kinsoku (금칙) — punctuation that must not start a line
+_KINSOKU_NO_START = set("）、。，．：；？！」』】〉》〕｝,.;:?!)]}…‥")
+# Kinsoku — brackets that must not end a line
+_KINSOKU_NO_END = set("（「『【〈《〔｛([{")
+# Max extra characters allowed by kinsoku before forcing a break
+_KINSOKU_MARGIN = 2
 
 
 def _wrap_text(text: str, fontsize: float, box_width: float) -> list[str]:
     """Wrap *text* into lines that fit within *box_width* at *fontsize*.
 
     Uses a simple character-width model: CJK chars are 1.0 * fontsize wide,
-    Latin chars are 0.6 * fontsize wide.  Applies kinsoku (금칙) rules for CJK.
+    Latin chars are 0.6 * fontsize wide.  Applies basic kinsoku (금칙) rules.
     """
     if box_width <= 0:
         return [text]
@@ -253,31 +247,28 @@ def _wrap_text(text: str, fontsize: float, box_width: float) -> list[str]:
     lines: list[str] = []
     current_line = ""
     current_width = 0.0
-    chars = list(text)
-    n = len(chars)
+    overflow = 0  # count of extra chars added by kinsoku
 
-    for idx, ch in enumerate(chars):
+    for ch in text:
         if ch == "\n":
             lines.append(current_line)
             current_line = ""
             current_width = 0.0
+            overflow = 0
             continue
         ch_width = fontsize * (1.0 if _is_cjk(ch) else 0.6)
         if current_width + ch_width > box_width and current_line:
-            # Kinsoku: don't break if next char is line-start prohibited
-            next_ch = chars[idx] if idx < n else ""
-            if next_ch in _KINSOKU_START:
-                current_line += ch
-                current_width += ch_width
-                continue
-            # Kinsoku: don't leave line-end prohibited char at end of line
-            if current_line and current_line[-1] in _KINSOKU_END:
-                current_line += ch
-                current_width += ch_width
-                continue
+            # Kinsoku: allow a few extra chars to avoid bad breaks
+            if overflow < _KINSOKU_MARGIN:
+                if ch in _KINSOKU_NO_START or (current_line[-1] in _KINSOKU_NO_END):
+                    current_line += ch
+                    current_width += ch_width
+                    overflow += 1
+                    continue
             lines.append(current_line)
             current_line = ch
             current_width = ch_width
+            overflow = 0
         else:
             current_line += ch
             current_width += ch_width

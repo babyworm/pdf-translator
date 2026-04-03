@@ -66,11 +66,96 @@ class Element:
     level: str | None = None
 
 
+def _bbox_overlaps(a: list[float], b: list[float]) -> bool:
+    """Check if two bounding boxes overlap significantly."""
+    if len(a) < 4 or len(b) < 4:
+        return False
+    x_overlap = max(0, min(a[2], b[2]) - max(a[0], b[0]))
+    y_overlap = max(0, min(a[3], b[3]) - max(a[1], b[1]))
+    overlap_area = x_overlap * y_overlap
+    a_area = max((a[2] - a[0]) * (a[3] - a[1]), 1)
+    b_area = max((b[2] - b[0]) * (b[3] - b[1]), 1)
+    smaller = min(a_area, b_area)
+    return overlap_area > smaller * 0.5
+
+
+def _deduplicate(elements: list[Element]) -> list[Element]:
+    """Remove duplicate elements where a parent's content contains a child's.
+
+    When the PDF structure yields both a parent node and its children with
+    overlapping content, keep only the more specific (child) elements.
+    """
+    result: list[Element] = []
+    n = len(elements)
+    skip = set()
+
+    for i in range(n):
+        if i in skip:
+            continue
+        a = elements[i]
+        a_text = a.content.strip()
+        if not a_text:
+            result.append(a)
+            continue
+        # Check if this element's text contains another element's text
+        # on the same page with overlapping bbox → keep the smaller one
+        is_superset = False
+        for j in range(n):
+            if i == j or j in skip:
+                continue
+            b = elements[j]
+            b_text = b.content.strip()
+            if not b_text or a.page_number != b.page_number:
+                continue
+            if a_text != b_text and b_text in a_text and _bbox_overlaps(a.bbox, b.bbox):
+                is_superset = True
+                break
+        if is_superset:
+            skip.add(i)
+        else:
+            result.append(a)
+
+    return result
+
+
+def _normalize_font_sizes(elements: list[Element]) -> list[Element]:
+    """Normalize font sizes so same-type elements use the most common size.
+
+    Documents typically use consistent font sizes per element type (e.g., all
+    body paragraphs at 12pt, all headings at 18pt). Extraction errors can
+    produce slight variations; this corrects them.
+    """
+    from collections import Counter
+
+    # Group font sizes by element type
+    size_counts: dict[str, Counter] = {}
+    for el in elements:
+        if el.type not in size_counts:
+            size_counts[el.type] = Counter()
+        # Round to nearest 0.5pt to group near-identical sizes
+        rounded = round(el.font_size * 2) / 2
+        size_counts[el.type][rounded] += 1
+
+    # Find most common size per type
+    canonical: dict[str, float] = {}
+    for etype, counter in size_counts.items():
+        if counter:
+            canonical[etype] = counter.most_common(1)[0][0]
+
+    # Apply canonical sizes
+    for el in elements:
+        if el.type in canonical:
+            el.font_size = canonical[el.type]
+
+    return elements
+
+
 def parse_elements(data: dict) -> list[Element]:
     elements: list[Element] = []
     for kid in data.get("kids", []):
         _collect(kid, elements)
-    return elements
+    elements = _deduplicate(elements)
+    return _normalize_font_sizes(elements)
 
 
 def _collect(node: dict, out: list[Element]) -> None:

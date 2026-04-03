@@ -54,6 +54,62 @@ def test_parse_elements_from_json():
     assert elements[1].content == "Body text here."
 
 
+def test_deduplicate_parent_child():
+    """Parent element containing child text is removed, children kept."""
+    raw = {
+        "kids": [
+            {
+                "type": "paragraph",
+                "content": "Hello world. This is a test.",
+                "page number": 1,
+                "bounding box": [72.0, 650.0, 540.0, 700.0],
+                "kids": [
+                    {
+                        "type": "paragraph",
+                        "content": "Hello world.",
+                        "page number": 1,
+                        "bounding box": [72.0, 650.0, 540.0, 675.0],
+                    },
+                    {
+                        "type": "paragraph",
+                        "content": "This is a test.",
+                        "page number": 1,
+                        "bounding box": [72.0, 675.0, 540.0, 700.0],
+                    },
+                ],
+            },
+        ],
+    }
+    elements = parse_elements(raw)
+    texts = [e.content for e in elements]
+    # Parent "Hello world. This is a test." should be removed
+    assert "Hello world. This is a test." not in texts
+    assert "Hello world." in texts
+    assert "This is a test." in texts
+
+
+def test_no_false_dedup_different_pages():
+    """Elements on different pages with same text are not deduped."""
+    raw = {
+        "kids": [
+            {
+                "type": "paragraph",
+                "content": "Repeated text.",
+                "page number": 1,
+                "bounding box": [72.0, 650.0, 540.0, 700.0],
+            },
+            {
+                "type": "paragraph",
+                "content": "Repeated text.",
+                "page number": 2,
+                "bounding box": [72.0, 650.0, 540.0, 700.0],
+            },
+        ],
+    }
+    elements = parse_elements(raw)
+    assert len(elements) == 2
+
+
 def test_ensure_java_passes_when_java_found():
     with patch("shutil.which", return_value="/usr/bin/java"):
         with patch("subprocess.run") as mock_run:
